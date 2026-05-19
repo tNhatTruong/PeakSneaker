@@ -1,0 +1,15 @@
+version: '3.9'
+services:
+  db:
+    image: postgres:16
+    container_name: peaksneaker_db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: peaknseaker
+    ports:
+      - "5432:5432"
+    volumes:
+      - peaknseaker_postgres_data:/var/lib/postgresql/data
+volumes:
+  peaknseaker_postgres_data:
