@@ -53,5 +53,18 @@ public class OrderItem {
         if (createdAt == null) {
             createdAt = Instant.now();
         }
+        calculateSubtotal();
+    }
+
+    // Tính tổng giá tiền của dòng vật phẩm: giá đã chốt chặn * số lượng
+    public void calculateSubtotal() {
+        if (this.unitPrice == null) {
+            this.unitPrice = BigDecimal.ZERO;
+        }
+        if (this.quantity == null) {
+            this.quantity = 0;
+        }
+        this.subtotal = this.unitPrice.multiply(BigDecimal.valueOf(this.quantity));
     }
 }
+

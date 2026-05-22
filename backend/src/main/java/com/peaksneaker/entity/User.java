@@ -64,4 +64,38 @@ public class User {
     protected void onUpdate() {
         updatedAt = Instant.now();
     }
+
+    // Bật cờ xác thực danh tính sau khi người dùng xác nhận qua Email/OTP
+    public void verify() {
+        this.isVerified = true;
+    }
+
+    // Đình chỉ tài khoản người dùng vi phạm (bùng đơn, gian lận...)
+    public void block() {
+        this.isActive = false;
+    }
+
+    // Kích hoạt lại tài khoản sau khi đã bị đình chỉ
+    public void activate() {
+        this.isActive = true;
+    }
+
+    // Trả về true nếu người dùng có quyền Quản trị viên
+    public boolean isAdmin() {
+        return "ADMIN".equalsIgnoreCase(this.role);
+    }
+
+    // Cập nhật thông tin hồ sơ cá nhân, bỏ qua các trường null hoặc rỗng
+    public void updateProfile(String firstName, String lastName, String phone) {
+        if (firstName != null && !firstName.trim().isEmpty()) {
+            this.firstName = firstName.trim();
+        }
+        if (lastName != null && !lastName.trim().isEmpty()) {
+            this.lastName = lastName.trim();
+        }
+        if (phone != null && !phone.trim().isEmpty()) {
+            this.phone = phone.trim();
+        }
+    }
 }
+

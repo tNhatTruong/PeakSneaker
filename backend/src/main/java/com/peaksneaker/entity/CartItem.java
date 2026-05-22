@@ -51,4 +51,17 @@ public class CartItem {
     protected void onUpdate() {
         updatedAt = Instant.now();
     }
+
+    // Tính tổng tiền của dòng sản phẩm này trong giỏ: giá biến thể * số lượng
+    public java.math.BigDecimal getSubtotal() {
+        if (this.productVariant == null) {
+            return java.math.BigDecimal.ZERO;
+        }
+        java.math.BigDecimal finalPrice = this.productVariant.getFinalPrice();
+        if (finalPrice == null) {
+            return java.math.BigDecimal.ZERO;
+        }
+        return finalPrice.multiply(java.math.BigDecimal.valueOf(this.quantity));
+    }
 }
+

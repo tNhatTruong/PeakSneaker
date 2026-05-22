@@ -67,4 +67,20 @@ public class Product {
     protected void onUpdate() {
         updatedAt = Instant.now();
     }
+
+    // Xóa mềm: đánh dấu sản phẩm là đã xóa thay vì xóa cứng, tránh làm hỏng lịch sử đơn hàng
+    public void softDelete() {
+        this.isDeleted = true;
+    }
+
+    // Khôi phục sản phẩm đã bị xóa mềm trở lại trạng thái bán bình thường
+    public void restore() {
+        this.isDeleted = false;
+    }
+
+    // Trả về true nếu sản phẩm chưa bị xóa mềm và có thể hiển thị trên gian hàng
+    public boolean isAvailable() {
+        return !this.isDeleted;
+    }
 }
+

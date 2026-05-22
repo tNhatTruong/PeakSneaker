@@ -58,4 +58,32 @@ public class Payment {
     protected void onUpdate() {
         updatedAt = Instant.now();
     }
+
+    // Xác nhận thanh toán thành công, ghi lại mã giao dịch và cập nhật trạng thái đơn hàng
+    public void markSuccess(String transactionId) {
+        this.transactionId = transactionId;
+        this.status = "SUCCESS";
+        this.paidAt = Instant.now();
+        
+        if (this.order != null) {
+            this.order.updatePaymentStatus("PAID");
+        }
+    }
+
+    // Đánh dấu giao dịch thất bại và cập nhật trạng thái thanh toán của đơn hàng
+    public void markFailed() {
+        this.status = "FAILED";
+        if (this.order != null) {
+            this.order.updatePaymentStatus("FAILED");
+        }
+    }
+
+    // Thực hiện hoàn tiền và cập nhật trạng thái thanh toán của đơn hàng
+    public void markRefunded() {
+        this.status = "REFUNDED";
+        if (this.order != null) {
+            this.order.updatePaymentStatus("REFUNDED");
+        }
+    }
 }
+
