@@ -35,6 +35,7 @@ public class ProductVariant {
     @Builder.Default
     private Integer stockQuantity = 0;
 
+    // phần chênh lệch thêm cho giá với sự thay đổi variant của product
     @Column(name = "price_adjustment", nullable = false, precision = 12, scale = 2)
     @Builder.Default
     private BigDecimal priceAdjustment = BigDecimal.ZERO;

@@ -54,23 +54,6 @@ public class Coupon {
     @Builder.Default
     private Instant createdAt = Instant.now();
 
-    @Column(name = "updated_at", nullable = false)
-    @Builder.Default
-    private Instant updatedAt = Instant.now();
-
-    @PrePersist
-    protected void onCreate() {
-        if (createdAt == null) {
-            createdAt = Instant.now();
-        }
-        updatedAt = Instant.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = Instant.now();
-    }
-
     // Kiểm tra xem mã giảm giá đã hết hạn hoặc chưa bắt đầu hiệu lực
     public boolean isExpired() {
         Instant now = Instant.now();

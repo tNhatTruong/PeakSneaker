@@ -25,9 +25,6 @@ public class Product {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false, unique = true)
-    private String slug;
-
     private String brand;
 
     @Column(columnDefinition = "text")
@@ -51,22 +48,6 @@ public class Product {
     @Builder.Default
     private Instant createdAt = Instant.now();
 
-    @Column(name = "updated_at", nullable = false)
-    @Builder.Default
-    private Instant updatedAt = Instant.now();
-
-    @PrePersist
-    protected void onCreate() {
-        if (createdAt == null) {
-            createdAt = Instant.now();
-        }
-        updatedAt = Instant.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = Instant.now();
-    }
 
     // Xóa mềm: đánh dấu sản phẩm là đã xóa thay vì xóa cứng, tránh làm hỏng lịch sử đơn hàng
     public void softDelete() {
