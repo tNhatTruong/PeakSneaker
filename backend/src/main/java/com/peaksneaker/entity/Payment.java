@@ -42,22 +42,6 @@ public class Payment {
     @Builder.Default
     private Instant createdAt = Instant.now();
 
-    @Column(name = "updated_at", nullable = false)
-    @Builder.Default
-    private Instant updatedAt = Instant.now();
-
-    @PrePersist
-    protected void onCreate() {
-        if (createdAt == null) {
-            createdAt = Instant.now();
-        }
-        updatedAt = Instant.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = Instant.now();
-    }
 
     // Xác nhận thanh toán thành công, ghi lại mã giao dịch và cập nhật trạng thái đơn hàng
     public void markSuccess(String transactionId) {

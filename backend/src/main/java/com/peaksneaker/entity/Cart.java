@@ -3,6 +3,7 @@ package com.peaksneaker.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;
+import java.util.List;
 
 @Entity
 @Table(name = "carts")
@@ -23,28 +24,8 @@ public class Cart {
 
     @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private java.util.List<CartItem> items = new java.util.ArrayList<>();
+    private List<CartItem> items = new java.util.ArrayList<>();
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    @Builder.Default
-    private Instant createdAt = Instant.now();
-
-    @Column(name = "updated_at", nullable = false)
-    @Builder.Default
-    private Instant updatedAt = Instant.now();
-
-    @PrePersist
-    protected void onCreate() {
-        if (createdAt == null) {
-            createdAt = Instant.now();
-        }
-        updatedAt = Instant.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = Instant.now();
-    }
 
     // Thêm biến thể giày vào giỏ; nếu biến thể đã tồn tại thì tăng số lượng
     public void addItem(ProductVariant variant, int quantity) {
