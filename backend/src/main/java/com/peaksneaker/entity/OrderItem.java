@@ -44,18 +44,6 @@ public class OrderItem {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal subtotal;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    @Builder.Default
-    private Instant createdAt = Instant.now();
-
-    @PrePersist
-    protected void onCreate() {
-        if (createdAt == null) {
-            createdAt = Instant.now();
-        }
-        calculateSubtotal();
-    }
-
     // Tính tổng giá tiền của dòng vật phẩm: giá đã chốt chặn * số lượng
     public void calculateSubtotal() {
         if (this.unitPrice == null) {

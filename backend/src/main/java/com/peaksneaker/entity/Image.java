@@ -23,21 +23,11 @@ public class Image {
     @Column(name = "reference_id", nullable = false)
     private Long referenceId;
 
-    @Column(name = "image_url", nullable = false, columnDefinition = "text")
-    private String imageUrl;
+    @Column(name = "image_name")
+    private String imageName;
 
     @Column(name = "is_primary", nullable = false)
     @Builder.Default
     private Boolean isPrimary = false;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    @Builder.Default
-    private Instant createdAt = Instant.now();
-
-    @PrePersist
-    protected void onCreate() {
-        if (createdAt == null) {
-            createdAt = Instant.now();
-        }
-    }
 }

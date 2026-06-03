@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 @Entity
 @Table(name = "orders")
@@ -26,12 +27,9 @@ public class Order {
     @JoinColumn(name = "coupon_id")
     private Coupon coupon;
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     @Builder.Default
-    private java.util.List<OrderItem> items = new java.util.ArrayList<>();
-
-    @Column(name = "coupon_code", length = 50)
-    private String couponCode;
+    private List<OrderItem> items = new java.util.ArrayList<>();
 
     @Column(name = "subtotal_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal subtotalAmount;
@@ -49,7 +47,7 @@ public class Order {
 
     @Column(nullable = false, length = 50)
     @Builder.Default
-    private String status = "PENDING"; // PENDING | CONFIRMED | SHIPPING | COMPLETED | CANCELLED
+    private String status = "PENDING"; // PENDING | SHIPPING | COMPLETED | CANCELLED
 
     @Column(name = "payment_status", nullable = false, length = 50)
     @Builder.Default
@@ -120,7 +118,6 @@ public class Order {
 
         // áp dụng giảm giá coupon nếu có
         if (this.coupon != null) {
-            this.couponCode = this.coupon.getCode();
             this.discountAmount = this.coupon.calculateDiscount(this.subtotalAmount);
         } else {
             this.discountAmount = BigDecimal.ZERO;
@@ -167,7 +164,7 @@ public class Order {
         switch (upperNext) {
             case "CONFIRMED":
                 if (!"PENDING".equalsIgnoreCase(this.status)) {
-                    throw new IllegalStateException("ʤChỉ đơn hàng ở trạng thái PENDING mới có thể xác nhận (CONFIRMED).");
+                    throw new IllegalStateException("Chỉ đơn hàng ở trạng thái PENDING mới có thể xác nhận CONFIRMED.");
                 }
                 // xác nhận đơn: trừ tồn kho các biến thể vật lý
                 if (this.items != null) {
@@ -182,14 +179,14 @@ public class Order {
 
             case "SHIPPING":
                 if (!"CONFIRMED".equalsIgnoreCase(this.status)) {
-                    throw new IllegalStateException("Đơn hàng phải được xác nhận (CONFIRMED) trước khi bàn giao vận chuyển (SHIPPING).");
+                    throw new IllegalStateException("Đơn hàng phải được xác nhận trước khi bàn giao vận chuyển.");
                 }
                 this.status = "SHIPPING";
                 break;
 
             case "COMPLETED":
                 if (!"SHIPPING".equalsIgnoreCase(this.status)) {
-                    throw new IllegalStateException("Đơn hàng phải đang trong trạng thái giao (SHIPPING) mới có thể đánh dấu hoàn tất (COMPLETED).");
+                    throw new IllegalStateException("Đơn hàng phải đang trong trạng thái giao mới có thể đánh dấu hoàn tất.");
                 }
                 this.status = "COMPLETED";
                 break;
@@ -216,7 +213,7 @@ public class Order {
                 break;
             case "REFUNDED":
                 if (!"PAID".equalsIgnoreCase(this.paymentStatus)) {
-                    throw new IllegalStateException("Chỉ có thể hoàn tiền (REFUNDED) đối với đơn hàng đã thanh toán thành công (PAID).");
+                    throw new IllegalStateException("Chỉ có thể hoàn tiền đối với đơn hàng đã thanh toán thành công");
                 }
                 this.paymentStatus = "REFUNDED";
                 break;

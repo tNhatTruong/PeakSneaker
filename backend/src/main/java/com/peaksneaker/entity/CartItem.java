@@ -31,26 +31,6 @@ public class CartItem {
     @Builder.Default
     private Integer quantity = 1;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    @Builder.Default
-    private Instant createdAt = Instant.now();
-
-    @Column(name = "updated_at", nullable = false)
-    @Builder.Default
-    private Instant updatedAt = Instant.now();
-
-    @PrePersist
-    protected void onCreate() {
-        if (createdAt == null) {
-            createdAt = Instant.now();
-        }
-        updatedAt = Instant.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = Instant.now();
-    }
 
     // Tính tổng tiền của dòng sản phẩm này trong giỏ: giá biến thể * số lượng
     public java.math.BigDecimal getSubtotal() {

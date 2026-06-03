@@ -34,7 +34,7 @@ public class User {
 
     @Column(nullable = false, length = 50)
     @Builder.Default
-    private String role = "USER";
+    private String role = "USER"; //USER ,ADMIN
 
     @Column(name = "is_verified", nullable = false)
     @Builder.Default
@@ -48,22 +48,6 @@ public class User {
     @Builder.Default
     private Instant createdAt = Instant.now();
 
-    @Column(name = "updated_at", nullable = false)
-    @Builder.Default
-    private Instant updatedAt = Instant.now();
-
-    @PrePersist
-    protected void onCreate() {
-        if (createdAt == null) {
-            createdAt = Instant.now();
-        }
-        updatedAt = Instant.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = Instant.now();
-    }
 
     // Bật cờ xác thực danh tính sau khi người dùng xác nhận qua Email/OTP
     public void verify() {
