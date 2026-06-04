@@ -6,10 +6,10 @@ services:
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: 123456
-      POSTGRES_DB: peaknseaker
+      POSTGRES_DB: peaksneaker
     ports:
       - "5432:5432"
     volumes:
-      - peaknseaker_postgres_data:/var/lib/postgresql/data
+      - peaksneaker_postgres_data:/var/lib/postgresql/data
 volumes:
-  peaknseaker_postgres_data:
+  peaksneaker_postgres_data:
