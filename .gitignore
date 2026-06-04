@@ -99,3 +99,5 @@ $RECYCLE.BIN/
 .vscode/
 .idea/
 .aider*
+
+.agents
