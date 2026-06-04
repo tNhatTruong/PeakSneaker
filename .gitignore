@@ -94,4 +94,10 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+### VS Code ###
+.vscode/
+.idea/
+.aider*
+
 .agents
