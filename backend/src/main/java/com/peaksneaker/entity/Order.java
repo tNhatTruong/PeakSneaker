@@ -24,8 +24,8 @@ public class Order {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "coupon_id")
-    private Coupon coupon;
+    @JoinColumn(name = "voucher_id")
+    private Voucher voucher;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     @Builder.Default
@@ -59,8 +59,17 @@ public class Order {
     @Column(name = "shipping_phone", nullable = false, length = 50)
     private String shippingPhone;
 
-    @Column(name = "shipping_address", nullable = false, columnDefinition = "text")
-    private String shippingAddress;
+    @Column(name = "shipping_province", nullable = false, length = 100)
+    private String shippingProvince;
+
+    @Column(name = "shipping_district", nullable = false, length = 100)
+    private String shippingDistrict;
+
+    @Column(name = "shipping_ward", nullable = false, length = 100)
+    private String shippingWard;
+
+    @Column(name = "shipping_street", nullable = false, columnDefinition = "text")
+    private String shippingStreet;
 
     @Column(columnDefinition = "text")
     private String note;
@@ -116,9 +125,9 @@ public class Order {
                 .map(OrderItem::getSubtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // áp dụng giảm giá coupon nếu có
-        if (this.coupon != null) {
-            this.discountAmount = this.coupon.calculateDiscount(this.subtotalAmount);
+        // áp dụng giảm giá voucher nếu có
+        if (this.voucher != null) {
+            this.discountAmount = this.voucher.calculateDiscount(this.subtotalAmount);
         } else {
             this.discountAmount = BigDecimal.ZERO;
         }
@@ -128,9 +137,9 @@ public class Order {
         this.finalAmount = finalVal.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : finalVal;
     }
 
-    // Trả về true nếu đơn hàng có thể bị hủy (chỉ khi PENDING hoặc CONFIRMED)
+    // Trả về true nếu đơn hàng có thể bị hủy (chỉ khi PENDING)
     public boolean canCancel() {
-        return "PENDING".equalsIgnoreCase(this.status) || "CONFIRMED".equalsIgnoreCase(this.status);
+        return "PENDING".equalsIgnoreCase(this.status);
     }
 
     // Hủy đơn hàng và hoàn trả tồn kho nếu đơn đã được xác nhận trước đó
@@ -139,19 +148,13 @@ public class Order {
             throw new IllegalStateException("Không thể hủy đơn hàng ở trạng thái hiện tại: " + this.status);
         }
 
-        // nếu đơn đã được xác nhận thì kho đã bị trừ, phải hoàn trả lại
-        if ("CONFIRMED".equalsIgnoreCase(this.status) && this.items != null) {
-            for (OrderItem item : this.items) {
-                if (item.getProductVariant() != null) {
-                    item.getProductVariant().increaseStock(item.getQuantity());
-                }
-            }
-        }
+        // Không cần xử lý kho ở bước hủy vì chỉ cho hủy lúc PENDING (kho chưa trừ)
+        // Nếu sau này thêm trạng thái CONFIRMED thì mới viết logic hoàn kho ở đây.
 
         this.status = "CANCELLED";
     }
 
-    // Điều phối trạng thái đơn hàng theo luồng: PENDING -> CONFIRMED -> SHIPPING -> COMPLETED
+    // Điều phối trạng thái đơn hàng theo luồng: PENDING -> SHIPPING -> COMPLETED
     public void advanceStatus(String nextStatus) {
         if (nextStatus == null) return;
 
@@ -162,24 +165,17 @@ public class Order {
         }
 
         switch (upperNext) {
-            case "CONFIRMED":
+            case "SHIPPING":
                 if (!"PENDING".equalsIgnoreCase(this.status)) {
-                    throw new IllegalStateException("Chỉ đơn hàng ở trạng thái PENDING mới có thể xác nhận CONFIRMED.");
+                    throw new IllegalStateException("Chỉ đơn hàng PENDING mới có thể chuyển sang SHIPPING.");
                 }
-                // xác nhận đơn: trừ tồn kho các biến thể vật lý
+                // Xác nhận giao hàng: trừ tồn kho các biến thể vật lý
                 if (this.items != null) {
                     for (OrderItem item : this.items) {
                         if (item.getProductVariant() != null) {
                             item.getProductVariant().decreaseStock(item.getQuantity());
                         }
                     }
-                }
-                this.status = "CONFIRMED";
-                break;
-
-            case "SHIPPING":
-                if (!"CONFIRMED".equalsIgnoreCase(this.status)) {
-                    throw new IllegalStateException("Đơn hàng phải được xác nhận trước khi bàn giao vận chuyển.");
                 }
                 this.status = "SHIPPING";
                 break;
