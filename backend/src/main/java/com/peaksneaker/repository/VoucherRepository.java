@@ -1,6 +1,6 @@
 package com.peaksneaker.repository;
 
-import com.peaksneaker.entity.Coupon;
+import com.peaksneaker.entity.Voucher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -9,13 +9,13 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface CouponRepository extends JpaRepository<Coupon, Long> {
+public interface VoucherRepository extends JpaRepository<Voucher, Long> {
 
-    Optional<Coupon> findByCode(String code);
+    Optional<Voucher> findByCode(String code);
 
     boolean existsByCode(String code);
 
-    Page<Coupon> findByIsActive(Boolean isActive, Pageable pageable);
+    Page<Voucher> findByIsActive(Boolean isActive, Pageable pageable);
 
-    Page<Coupon> findByCodeContainingIgnoreCase(String code, Pageable pageable);
+    Page<Voucher> findByCodeContainingIgnoreCase(String code, Pageable pageable);
 }
