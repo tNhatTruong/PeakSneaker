@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: 123456
       POSTGRES_DB: peaksneaker
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - peaksneaker_postgres_data:/var/lib/postgresql/data
 volumes:
