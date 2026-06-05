@@ -24,9 +24,9 @@ class DomainLogicTests {
     }
 
     @Test
-    void testCouponValidityAndDiscountCalculation() {
-        // Active, valid PERCENTAGE coupon (10% off, max discount 15, min order 50)
-        Coupon coupon = Coupon.builder()
+    void testVoucherValidityAndDiscountCalculation() {
+        // Active, valid PERCENTAGE voucher (10% off, max discount 15, min order 50)
+        Voucher voucher = Voucher.builder()
                 .code("SALE10")
                 .discountType("PERCENTAGE")
                 .discountValue(BigDecimal.valueOf(10.00))
@@ -34,37 +34,37 @@ class DomainLogicTests {
                 .maxDiscountAmount(BigDecimal.valueOf(15.00))
                 .usageLimit(10)
                 .usedCount(0)
-                .startsAt(Instant.now().minus(1, ChronoUnit.DAYS))
-                .expiresAt(Instant.now().plus(1, ChronoUnit.DAYS))
+                .startAt(Instant.now().minus(1, ChronoUnit.DAYS))
+                .expireAt(Instant.now().plus(1, ChronoUnit.DAYS))
                 .isActive(true)
                 .build();
 
         // 1. Check order subtotal too low
-        assertFalse(coupon.isValidForOrder(BigDecimal.valueOf(40.00)));
-        assertEquals(BigDecimal.ZERO, coupon.calculateDiscount(BigDecimal.valueOf(40.00)));
+        assertFalse(voucher.isValidForOrder(BigDecimal.valueOf(40.00)));
+        assertEquals(BigDecimal.ZERO, voucher.calculateDiscount(BigDecimal.valueOf(40.00)));
 
         // 2. Check valid order under cap (10% of 100 = 10)
-        assertTrue(coupon.isValidForOrder(BigDecimal.valueOf(100.00)));
-        assertEquals(BigDecimal.valueOf(10.00), coupon.calculateDiscount(BigDecimal.valueOf(100.00)));
+        assertTrue(voucher.isValidForOrder(BigDecimal.valueOf(100.00)));
+        assertEquals(0, BigDecimal.valueOf(10.00).compareTo(voucher.calculateDiscount(BigDecimal.valueOf(100.00))));
 
         // 3. Check valid order capped (10% of 200 = 20, capped at 15)
-        assertEquals(BigDecimal.valueOf(15.00), coupon.calculateDiscount(BigDecimal.valueOf(200.00)));
+        assertEquals(0, BigDecimal.valueOf(15.00).compareTo(voucher.calculateDiscount(BigDecimal.valueOf(200.00))));
 
-        // 4. Check expired coupon
-        coupon.setExpiresAt(Instant.now().minus(1, ChronoUnit.HOURS));
-        assertFalse(coupon.isValidForOrder(BigDecimal.valueOf(100.00)));
-        assertEquals(BigDecimal.ZERO, coupon.calculateDiscount(BigDecimal.valueOf(100.00)));
+        // 4. Check expired voucher
+        voucher.setExpireAt(Instant.now().minus(1, ChronoUnit.HOURS));
+        assertFalse(voucher.isValidForOrder(BigDecimal.valueOf(100.00)));
+        assertEquals(BigDecimal.ZERO, voucher.calculateDiscount(BigDecimal.valueOf(100.00)));
 
-        // 5. Check inactive coupon
-        coupon.setExpiresAt(Instant.now().plus(1, ChronoUnit.DAYS));
-        coupon.setIsActive(false);
-        assertFalse(coupon.isValidForOrder(BigDecimal.valueOf(100.00)));
+        // 5. Check inactive voucher
+        voucher.setExpireAt(Instant.now().plus(1, ChronoUnit.DAYS));
+        voucher.setIsActive(false);
+        assertFalse(voucher.isValidForOrder(BigDecimal.valueOf(100.00)));
 
         // 6. Check usage limit reached
-        coupon.setIsActive(true);
-        coupon.setUsedCount(10);
-        assertFalse(coupon.isValidForOrder(BigDecimal.valueOf(100.00)));
-        assertThrows(IllegalStateException.class, coupon::incrementUsage);
+        voucher.setIsActive(true);
+        voucher.setUsedCount(10);
+        assertFalse(voucher.isValidForOrder(BigDecimal.valueOf(100.00)));
+        assertThrows(IllegalStateException.class, voucher::incrementUsage);
     }
 
     @Test
@@ -73,7 +73,7 @@ class DomainLogicTests {
         ProductVariant variant1 = ProductVariant.builder().product(product).priceAdjustment(BigDecimal.valueOf(0)).build();
         ProductVariant variant2 = ProductVariant.builder().product(product).priceAdjustment(BigDecimal.valueOf(20.00)).build();
 
-        Coupon coupon = Coupon.builder()
+        Voucher voucher = Voucher.builder()
                 .code("FIXED50")
                 .discountType("FIXED")
                 .discountValue(BigDecimal.valueOf(50.00))
@@ -81,7 +81,7 @@ class DomainLogicTests {
                 .build();
 
         Order order = Order.builder()
-                .coupon(coupon)
+                .voucher(voucher)
                 .build();
 
         OrderItem item1 = OrderItem.builder()
@@ -128,15 +128,19 @@ class DomainLogicTests {
 
         assertEquals("PENDING", order.getStatus());
 
-        // 1. Advance to CONFIRMED -> Stock should decrease from 10 to 7
-        order.advanceStatus("CONFIRMED");
-        assertEquals("CONFIRMED", order.getStatus());
+        // 1. Advance to SHIPPING -> Stock should decrease from 10 to 7
+        order.advanceStatus("SHIPPING");
+        assertEquals("SHIPPING", order.getStatus());
         assertEquals(7, variant.getStockQuantity());
 
-        // 2. Cancel order -> Stock should return from 7 to 10
-        order.cancel();
-        assertEquals("CANCELLED", order.getStatus());
-        assertEquals(10, variant.getStockQuantity());
+        // 2. Cancel order from SHIPPING is not allowed directly without logic, but for test:
+        // Actually, in the new logic, cancel() only works in PENDING.
+        assertThrows(IllegalStateException.class, order::cancel);
+        
+        // 3. Let's create another PENDING order and cancel it
+        Order pendingOrder = Order.builder().build();
+        pendingOrder.cancel();
+        assertEquals("CANCELLED", pendingOrder.getStatus());
     }
 
     @Test
