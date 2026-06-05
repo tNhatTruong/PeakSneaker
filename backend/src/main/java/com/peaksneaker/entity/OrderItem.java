@@ -3,7 +3,6 @@ package com.peaksneaker.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
-import java.time.Instant;
 
 @Entity
 @Table(name = "order_items")

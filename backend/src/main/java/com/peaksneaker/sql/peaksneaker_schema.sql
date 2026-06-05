@@ -4,6 +4,18 @@
 
 --chạy file trong schema public
 
+DROP TABLE IF EXISTS payments CASCADE;
+DROP TABLE IF EXISTS order_items CASCADE;
+DROP TABLE IF EXISTS orders CASCADE;
+DROP TABLE IF EXISTS vouchers CASCADE;
+DROP TABLE IF EXISTS cart_items CASCADE;
+DROP TABLE IF EXISTS carts CASCADE;
+DROP TABLE IF EXISTS images CASCADE;
+DROP TABLE IF EXISTS product_variants CASCADE;
+DROP TABLE IF EXISTS products CASCADE;
+DROP TABLE IF EXISTS categories CASCADE;
+DROP TABLE IF EXISTS addresses CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
 
 -- =========================================================
 -- USERS
@@ -20,6 +32,25 @@ CREATE TABLE users
     is_verified   boolean             NOT NULL,
     is_active     boolean             NOT NULL,
     created_at    timestamptz         NOT NULL
+);
+
+-- =========================================================
+-- ADDRESSES (Sổ địa chỉ)
+-- =========================================================
+CREATE TABLE addresses
+(
+    id             BIGSERIAL PRIMARY KEY,
+    user_id        bigint         NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    recipient_name varchar(100)   NOT NULL,
+    phone          varchar(20)    NOT NULL,
+    province_id    varchar(50)    NOT NULL,
+    province_name  varchar(100)   NOT NULL,
+    district_id    varchar(50)    NOT NULL,
+    district_name  varchar(100)   NOT NULL,
+    ward_id        varchar(50)    NOT NULL,
+    ward_name      varchar(100)   NOT NULL,
+    street_detail  text           NOT NULL,
+    is_default     boolean        NOT NULL DEFAULT true
 );
 
 -- =========================================================
@@ -104,9 +135,9 @@ CREATE TABLE cart_items
 );
 
 -- =========================================================
--- COUPONS
+-- VOUCHERS
 -- =========================================================
-CREATE TABLE coupons
+CREATE TABLE vouchers
 (
     id                  BIGSERIAL PRIMARY KEY,
     code                varchar(50) UNIQUE NOT NULL,
@@ -116,8 +147,8 @@ CREATE TABLE coupons
     max_discount_amount decimal(12, 2),
     usage_limit         integer,
     used_count          integer            NOT NULL,
-    starts_at           timestamptz,
-    expires_at          timestamptz,
+    start_at            timestamptz,
+    expire_at           timestamptz,
     is_active           boolean            NOT NULL,
     created_at          timestamptz        NOT NULL
 );
@@ -129,7 +160,7 @@ CREATE TABLE orders
 (
     id               BIGSERIAL PRIMARY KEY,
     user_id          bigint         REFERENCES users (id) ON DELETE SET NULL,
-    coupon_id        bigint         REFERENCES coupons (id) ON DELETE SET NULL,
+    voucher_id       bigint         REFERENCES vouchers (id) ON DELETE SET NULL,
     subtotal_amount  decimal(12, 2) NOT NULL,
     discount_amount  decimal(12, 2) NOT NULL,
     shipping_fee     decimal(12, 2) NOT NULL,
@@ -137,9 +168,12 @@ CREATE TABLE orders
     status           varchar(50)    NOT NULL,
     payment_status   varchar(50)    NOT NULL,
     shipping_name    varchar(255)   NOT NULL,
-    shipping_phone   varchar(50)    NOT NULL,
-    shipping_address text           NOT NULL,
-    note             text,
+    shipping_phone    varchar(50)    NOT NULL,
+    shipping_province varchar(100)   NOT NULL,
+    shipping_district varchar(100)   NOT NULL,
+    shipping_ward     varchar(100)   NOT NULL,
+    shipping_street   text           NOT NULL,
+    note              text,
     created_at       timestamptz    NOT NULL,
     updated_at       timestamptz    NOT NULL
 );

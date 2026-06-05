@@ -51,6 +51,10 @@ public class ProductVariant {
     @Builder.Default
     private Instant updatedAt = Instant.now();
 
+    @OneToMany(mappedBy = "productVariant", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private java.util.List<Image> images = new java.util.ArrayList<>();
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
