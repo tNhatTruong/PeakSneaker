@@ -48,8 +48,16 @@ public class Product {
     @Builder.Default
     private Instant createdAt = Instant.now();
 
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private java.util.List<ProductVariant> variants = new java.util.ArrayList<>();
 
-    // Xóa mềm: đánh dấu sản phẩm là đã xóa thay vì xóa cứng, tránh làm hỏng lịch sử đơn hàng
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private java.util.List<Image> images = new java.util.ArrayList<>();
+
+    // Xóa mềm: đánh dấu sản phẩm là đã xóa thay vì xóa cứng, tránh làm hỏng lịch sử
+    // đơn hàng
     public void softDelete() {
         this.isDeleted = true;
     }
@@ -64,4 +72,3 @@ public class Product {
         return !this.isDeleted;
     }
 }
-

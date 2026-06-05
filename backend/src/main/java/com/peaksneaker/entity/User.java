@@ -48,6 +48,17 @@ public class User {
     @Builder.Default
     private Instant createdAt = Instant.now();
 
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private Cart cart;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
+    private java.util.List<Address> addresses = new java.util.ArrayList<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
+    private java.util.List<Order> orders = new java.util.ArrayList<>();
+
 
     // Bật cờ xác thực danh tính sau khi người dùng xác nhận qua Email/OTP
     public void verify() {
