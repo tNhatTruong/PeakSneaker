@@ -2,7 +2,6 @@ package com.peaksneaker.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.Instant;
 
 @Entity
 @Table(name = "cart_items", uniqueConstraints = {

@@ -6,13 +6,13 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 @Entity
-@Table(name = "coupons")
+@Table(name = "vouchers")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Coupon {
+public class Voucher {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -40,11 +40,11 @@ public class Coupon {
     @Builder.Default
     private Integer usedCount = 0;
 
-    @Column(name = "starts_at")
-    private Instant startsAt;
+    @Column(name = "start_at")
+    private Instant startAt;
 
-    @Column(name = "expires_at")
-    private Instant expiresAt;
+    @Column(name = "expire_at")
+    private Instant expireAt;
 
     @Column(name = "is_active", nullable = false)
     @Builder.Default
@@ -57,10 +57,10 @@ public class Coupon {
     // Kiểm tra xem mã giảm giá đã hết hạn hoặc chưa bắt đầu hiệu lực
     public boolean isExpired() {
         Instant now = Instant.now();
-        if (this.startsAt != null && now.isBefore(this.startsAt)) {
+        if (this.startAt != null && now.isBefore(this.startAt)) {
             return true;
         }
-        if (this.expiresAt != null && now.isAfter(this.expiresAt)) {
+        if (this.expireAt != null && now.isAfter(this.expireAt)) {
             return true;
         }
         return false;

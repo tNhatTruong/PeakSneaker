@@ -2,7 +2,6 @@ package com.peaksneaker.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.Instant;
 
 @Entity
 @Table(name = "images")
@@ -17,17 +16,23 @@ public class Image {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "reference_type", nullable = false, length = 50)
-    private String referenceType; // PRODUCT | CATEGORY | USER | VARIANT
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id")
+    private Product product;
 
-    @Column(name = "reference_id", nullable = false)
-    private Long referenceId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_variant_id")
+    private ProductVariant productVariant;
 
-    @Column(name = "image_name")
-    private String imageName;
+    @Column(name = "image_url", nullable = false, length = 500)
+    private String imageUrl;
 
     @Column(name = "is_primary", nullable = false)
     @Builder.Default
     private Boolean isPrimary = false;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    @Builder.Default
+    private java.time.Instant createdAt = java.time.Instant.now();
 
 }

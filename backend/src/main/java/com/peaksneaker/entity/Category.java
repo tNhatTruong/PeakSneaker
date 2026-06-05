@@ -2,7 +2,6 @@ package com.peaksneaker.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.Instant;
 
 @Entity
 @Table(name = "categories")
@@ -29,6 +28,10 @@ public class Category {
 
     @Column(columnDefinition = "text")
     private String description;
+
+    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
+    @Builder.Default
+    private java.util.List<Category> children = new java.util.ArrayList<>();
 
 
     // Trả về true nếu đây là danh mục gốc (không có danh mục cha)
