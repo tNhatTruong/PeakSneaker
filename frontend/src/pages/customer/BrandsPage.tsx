@@ -1,43 +1,22 @@
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
+import { useState, useEffect } from "react";
+import { BrandService, type Brand } from "../../services/brandService";
 
 export default function BrandsPage() {
-  // Dữ liệu mô phỏng: Phân loại theo Hãng, bên trong Hãng là các Dòng giày (Silhouettes)
-  const brandsData = [
-    {
-      id: "nike",
-      name: "NIKE",
-      description: "Classic silhouettes and cutting-edge innovation to build your game from the ground up.",
-      logoUrl: "https://upload.wikimedia.org/wikipedia/commons/a/a6/Logo_NIKE.svg",
-      silhouettes: [
-        { id: "aj1", name: "Air Jordan 1", imageUrl: "https://images.unsplash.com/photo-1605340537586-0a5a228fdd64?auto=format&fit=crop&q=80&w=300" },
-        { id: "af1", name: "Air Force 1", imageUrl: "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&q=80&w=300" },
-        { id: "dunk", name: "Dunk", imageUrl: "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&q=80&w=300" },
-        { id: "airmax", name: "Air Max", imageUrl: "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?auto=format&fit=crop&q=80&w=300" },
-        { id: "pegasus", name: "Pegasus", imageUrl: "https://images.unsplash.com/photo-1551107696-a4b0c5a0d9a2?auto=format&fit=crop&q=80&w=300" },
-      ]
-    },
-    {
-      id: "adidas",
-      name: "ADIDAS",
-      description: "Sự giao thoa hoàn hảo giữa thể thao chuyên nghiệp và thời trang đường phố.",
-      logoUrl: "https://upload.wikimedia.org/wikipedia/commons/2/20/Adidas_Logo.svg",
-      silhouettes: [
-        { id: "yeezy", name: "Yeezy Boost", imageUrl: "https://images.unsplash.com/photo-1620012253295-c15ce331ff61?auto=format&fit=crop&q=80&w=300" },
-        { id: "samba", name: "Samba", imageUrl: "https://images.unsplash.com/photo-1588117305388-c2631a279f82?auto=format&fit=crop&q=80&w=300" },
-      ]
-    },
-    {
-      id: "new-balance",
-      name: "NEW BALANCE",
-      description: "Vẻ đẹp 'Dad Shoe' cổ điển vượt thời gian kết hợp cùng sự thoải mái tối đa.",
-      logoUrl: "https://upload.wikimedia.org/wikipedia/commons/e/ea/New_Balance_logo.svg",
-      silhouettes: [
-        { id: "nb550", name: "550", imageUrl: "https://images.unsplash.com/photo-1539185441755-769473a23570?auto=format&fit=crop&q=80&w=300" },
-        { id: "nb2002r", name: "2002R", imageUrl: "https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&q=80&w=300" },
-      ]
-    }
-  ];
+  const [brandsData, setBrandsData] = useState<Brand[]>([]);
+  useEffect(() => {
+    const fetchBrands = async () => {
+      try {
+        const data = await BrandService.getAllBrands();
+        setBrandsData(data);
+      } catch (error) {
+        console.error("Failed to fetch brands data:", error);
+      }
+    };
+
+    fetchBrands();
+  }, []);
 
   return (
     <div className="bg-white min-h-screen">
@@ -74,11 +53,11 @@ export default function BrandsPage() {
 
               {/* Silhouettes Spotlight Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-6 gap-y-12 mb-10">
-                {brand.silhouettes.map((item) => (
-                  <Link key={item.id} to={`/shop?brand=${brand.id}&silhouette=${item.id}`} className="group flex flex-col items-center">
+                {brand.silhouettes?.map((item) => (
+                  <Link key={item.id} to={`/shop?brand=${brand.name.toLowerCase()}&silhouette=${item.name.toLowerCase()}`} className="group flex flex-col items-center">
                     <div className="w-full h-24 md:h-32 mb-4 flex items-center justify-center transition-transform duration-300 group-hover:-translate-y-2">
                       <img 
-                        src={item.imageUrl} 
+                        src={item.imageUrl || 'https://placehold.co/300x300/png?text=No+Image'} 
                         alt={item.name} 
                         className="w-full h-full object-contain mix-blend-multiply drop-shadow-sm" 
                         loading="lazy"
@@ -92,8 +71,8 @@ export default function BrandsPage() {
               </div>
 
               {/* View all button for brand */}
-              <div className="flex justify-center border-b border-zinc-200 pb-16">
-                <Link to={`/shop?brand=${brand.id}`} className="inline-flex items-center text-xs font-bold uppercase tracking-widest text-zinc-900 hover:text-zinc-500 transition-colors">
+              <div className="flex justify-center border-b border-zinc-200 pb-16 pt-8">
+                <Link to={`/shop?brand=${brand.name.toLowerCase()}`} className="inline-flex items-center text-xs font-bold uppercase tracking-widest text-zinc-900 hover:text-zinc-500 transition-colors">
                   Xem tất cả sản phẩm {brand.name} <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </div>
