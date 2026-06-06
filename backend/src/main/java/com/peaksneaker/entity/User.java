@@ -59,6 +59,9 @@ public class User {
     @Builder.Default
     private java.util.List<Order> orders = new java.util.ArrayList<>();
 
+    @Transient
+    private String fullname;
+
 
     // Bật cờ xác thực danh tính sau khi người dùng xác nhận qua Email/OTP
     public void verify() {
@@ -91,6 +94,10 @@ public class User {
         if (phone != null && !phone.trim().isEmpty()) {
             this.phone = phone.trim();
         }
+    }
+
+    public String getFullname(){
+        return this.firstName + " " + this.lastName;
     }
 }
 
