@@ -1,29 +1,33 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ShieldCheck, Truck, RefreshCcw } from "lucide-react";
 import ProductCard from "../../components/customer/ProductCard";
+import { ProductService, type ProductResponse } from "../../services/productService";
+import { BrandService, type Brand } from "../../services/brandService";
 
 export default function HomePage() {
-  // Hardcode data mồi (Mock Data)
-  const bestSellers = [
-    { id: "1", name: "Nike Air Force 1 '07", price: 2990000, category: "Lifestyle", imageUrl: "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&q=80&w=600" },
-    { id: "2", name: "Jordan 1 Retro High OG", price: 5490000, category: "Jordan", imageUrl: "https://images.unsplash.com/photo-1605340537586-0a5a228fdd64?auto=format&fit=crop&q=80&w=600" },
-    { id: "3", name: "New Balance 550", price: 3290000, category: "Lifestyle", imageUrl: "https://images.unsplash.com/photo-1539185441755-769473a23570?auto=format&fit=crop&q=80&w=600" },
-    { id: "4", name: "Adidas Yeezy Boost 350 V2", price: 6590000, category: "Yeezy", imageUrl: "https://images.unsplash.com/photo-1620012253295-c15ce331ff61?auto=format&fit=crop&q=80&w=600" },
-  ];
+  const [bestSellers, setBestSellers] = useState<ProductResponse[]>([]);
+  const [newArrivals, setNewArrivals] = useState<ProductResponse[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
 
-  const newArrivals = [
-    { id: "5", name: "Nike Dunk Low Panda", price: 3500000, category: "Nike", imageUrl: "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&q=80&w=600" },
-    { id: "6", name: "Asics Gel-Kayano 14", price: 4200000, category: "Running", imageUrl: "https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&q=80&w=600" },
-    { id: "7", name: "Salomon XT-6", price: 5100000, category: "Outdoor", imageUrl: "https://images.unsplash.com/photo-1551107696-a4b0c5a0d9a2?auto=format&fit=crop&q=80&w=600" },
-    { id: "8", name: "Converse Chuck 70", price: 1800000, category: "Classic", imageUrl: "https://images.unsplash.com/photo-1607522370275-f14206abe5d3?auto=format&fit=crop&q=80&w=600" },
-  ];
+  useEffect(() => {
+    const fetchHomeData = async () => {
+      try {
+        const [featuredData, newData, brandsData] = await Promise.all([
+          ProductService.getFeaturedProducts(4),
+          ProductService.getNewArrivals(4),
+          BrandService.getAllBrands(),
+        ]);
+        setBestSellers(featuredData);
+        setNewArrivals(newData);
+        setBrands(brandsData.slice(0, 4)); // Chỉ lấy 4 brand đầu tiên cho trang chủ
+      } catch (error) {
+        console.error("Failed to fetch home data:", error);
+      }
+    };
 
-  const brands = [
-    { name: "Nike", imageUrl: "https://images.unsplash.com/photo-1616124619460-ff4ed8f4683c?auto=format&fit=crop&q=80&w=600" },
-    { name: "Jordan", imageUrl: "https://images.unsplash.com/photo-1579338908476-3a3a1d71a706?auto=format&fit=crop&q=80&w=600" },
-    { name: "Adidas", imageUrl: "https://images.unsplash.com/photo-1588117305388-c2631a279f82?auto=format&fit=crop&q=80&w=600" },
-    { name: "New Balance", imageUrl: "https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&q=80&w=600" }, // Reusing asics image for aesthetic demo
-  ];
+    fetchHomeData();
+  }, []);
 
   return (
     <div className="w-full">
@@ -97,7 +101,14 @@ export default function HomePage() {
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
           {bestSellers.map((product) => (
-            <ProductCard key={product.id} {...product} />
+            <ProductCard 
+              key={product.id} 
+              id={product.id.toString()}
+              name={product.name}
+              price={product.basePrice}
+              imageUrl={product.defaultImageUrl || 'https://placehold.co/600x600/png?text=No+Image'}
+              category={product.brand ? product.brand.name : 'Unknown'}
+            />
           ))}
         </div>
       </section>
@@ -112,7 +123,7 @@ export default function HomePage() {
             {brands.map((brand, idx) => (
               <Link key={idx} to={`/shop?brand=${brand.name.toLowerCase()}`} className="group relative h-64 overflow-hidden bg-zinc-200">
                 <img 
-                  src={brand.imageUrl} 
+                  src={brand.logoUrl || 'https://placehold.co/600x600/png?text=No+Logo'} 
                   alt={brand.name} 
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 />
@@ -139,7 +150,14 @@ export default function HomePage() {
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
           {newArrivals.map((product) => (
-            <ProductCard key={product.id} {...product} />
+            <ProductCard 
+              key={product.id} 
+              id={product.id.toString()}
+              name={product.name}
+              price={product.basePrice}
+              imageUrl={product.defaultImageUrl || 'https://placehold.co/600x600/png?text=No+Image'}
+              category={product.brand ? product.brand.name : 'Unknown'}
+            />
           ))}
         </div>
       </section>

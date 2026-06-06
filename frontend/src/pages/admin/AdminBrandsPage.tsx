@@ -1,8 +1,11 @@
-import { Plus, Search, Edit2, Trash2, X } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, X, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 
 export default function AdminBrandsPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedBrand, setSelectedBrand] = useState<any>(null);
 
   // Chuyển brands thành state để có thể mock tính năng thêm mới trên UI
   const [brands, setBrands] = useState([
@@ -83,10 +86,18 @@ export default function AdminBrandsPage() {
                     </button>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button className="p-2 text-zinc-400 hover:text-blue-600 transition-colors mr-1" title="Sửa">
+                    <button 
+                      onClick={() => { setSelectedBrand(brand); setIsEditModalOpen(true); }}
+                      className="p-2 text-zinc-400 hover:text-blue-600 transition-colors mr-1" 
+                      title="Sửa"
+                    >
                       <Edit2 className="w-4 h-4" />
                     </button>
-                    <button className="p-2 text-zinc-400 hover:text-red-600 transition-colors" title="Xóa">
+                    <button 
+                      onClick={() => { setSelectedBrand(brand); setIsDeleteModalOpen(true); }}
+                      className="p-2 text-zinc-400 hover:text-red-600 transition-colors" 
+                      title="Xóa"
+                    >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </td>
@@ -170,6 +181,97 @@ export default function AdminBrandsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Popup Modal Sửa Thương Hiệu */}
+      {isEditModalOpen && selectedBrand && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
+            <div className="flex items-center justify-between p-5 border-b border-zinc-100">
+              <h3 className="text-lg font-bold text-zinc-900">Sửa Thương Hiệu</h3>
+              <button 
+                onClick={() => setIsEditModalOpen(false)} 
+                className="text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 p-1 rounded-md transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={(e) => { e.preventDefault(); setIsEditModalOpen(false); }} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1.5">Tên Thương Hiệu <span className="text-red-500">*</span></label>
+                <input 
+                  required 
+                  name="brandName"
+                  type="text" 
+                  defaultValue={selectedBrand.name}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent transition-shadow" 
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1.5">Đường dẫn Logo (URL) <span className="text-red-500">*</span></label>
+                <input 
+                  required 
+                  name="logoUrl"
+                  type="url" 
+                  defaultValue={selectedBrand.logo}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent transition-shadow" 
+                />
+              </div>
+              
+              <div className="pt-4 mt-6 border-t border-zinc-100 flex justify-end space-x-3">
+                <button 
+                  type="button" 
+                  onClick={() => setIsEditModalOpen(false)} 
+                  className="px-4 py-2.5 text-sm font-medium text-zinc-700 bg-zinc-100 rounded-md hover:bg-zinc-200 transition-colors"
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-4 py-2.5 text-sm font-medium text-white bg-zinc-900 rounded-md hover:bg-zinc-800 transition-colors shadow-sm"
+                >
+                  Cập nhật
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Xác Nhận Xóa */}
+      {isDeleteModalOpen && selectedBrand && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
+            <div className="p-6 text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+              </div>
+              <h3 className="text-lg font-bold text-zinc-900 mb-2">Xóa Thương Hiệu</h3>
+              <p className="text-sm text-zinc-500 mb-6">
+                Bạn có chắc chắn muốn xóa thương hiệu <span className="font-medium text-zinc-900">{selectedBrand.name}</span> không? Hành động này không thể hoàn tác.
+              </p>
+              <div className="flex justify-center space-x-3">
+                <button 
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-md transition-colors"
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  onClick={() => {
+                    setBrands(brands.filter(b => b.id !== selectedBrand.id));
+                    setIsDeleteModalOpen(false);
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors shadow-sm"
+                >
+                  Xóa vĩnh viễn
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
