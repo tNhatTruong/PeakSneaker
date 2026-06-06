@@ -1,6 +1,10 @@
-import { Search, Ban, CheckCircle2 } from "lucide-react";
+import { Search, Ban, CheckCircle2, AlertTriangle } from "lucide-react";
+import { useState } from "react";
 
 export default function AdminCustomersPage() {
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+
   const users = [
     { id: 1, name: "Trần Nhật Trường", email: "truong@gmail.com", phone: "0912345678", joined: "15-05-2026", status: "Active" },
     { id: 2, name: "Nguyễn Thiết Hình", email: "hinh@gmail.com", phone: "0987654321", joined: "20-05-2026", status: "Active" },
@@ -54,11 +58,19 @@ export default function AdminCustomersPage() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     {user.status === 'Active' ? (
-                      <button className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors" title="Khóa tài khoản">
+                      <button 
+                        onClick={() => { setSelectedUser(user); setIsConfirmModalOpen(true); }}
+                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors" 
+                        title="Khóa tài khoản"
+                      >
                         <Ban className="w-3.5 h-3.5 mr-1.5" /> Khóa
                       </button>
                     ) : (
-                      <button className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-md transition-colors" title="Mở khóa tài khoản">
+                      <button 
+                        onClick={() => { setSelectedUser(user); setIsConfirmModalOpen(true); }}
+                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-md transition-colors" 
+                        title="Mở khóa tài khoản"
+                      >
                         <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Mở khóa
                       </button>
                     )}
@@ -69,6 +81,40 @@ export default function AdminCustomersPage() {
           </table>
         </div>
       </div>
+
+      {/* Modal Xác Nhận Khóa/Mở Khóa */}
+      {isConfirmModalOpen && selectedUser && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
+            <div className="p-6 text-center">
+              <div className={`mx-auto flex items-center justify-center h-12 w-12 rounded-full mb-4 ${selectedUser.status === 'Active' ? 'bg-red-100' : 'bg-green-100'}`}>
+                <AlertTriangle className={`h-6 w-6 ${selectedUser.status === 'Active' ? 'text-red-600' : 'text-green-600'}`} />
+              </div>
+              <h3 className="text-lg font-bold text-zinc-900 mb-2">
+                Xác nhận {selectedUser.status === 'Active' ? 'Khóa' : 'Mở khóa'} tài khoản
+              </h3>
+              <p className="text-sm text-zinc-500 mb-6">
+                Bạn có chắc chắn muốn {selectedUser.status === 'Active' ? 'khóa' : 'mở khóa'} tài khoản của người dùng <span className="font-medium text-zinc-900">{selectedUser.name}</span> không?
+                {selectedUser.status === 'Active' && " Họ sẽ không thể đăng nhập vào hệ thống sau khi bị khóa."}
+              </p>
+              <div className="flex justify-center space-x-3">
+                <button 
+                  onClick={() => setIsConfirmModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-md transition-colors"
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  onClick={() => setIsConfirmModalOpen(false)}
+                  className={`px-4 py-2 text-sm font-medium text-white rounded-md transition-colors shadow-sm ${selectedUser.status === 'Active' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
+                >
+                  Đồng ý
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

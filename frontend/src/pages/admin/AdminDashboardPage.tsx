@@ -1,4 +1,5 @@
 import { DollarSign, Package, Users, Activity } from "lucide-react";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function AdminDashboardPage() {
   const metrics = [
@@ -6,6 +7,16 @@ export default function AdminDashboardPage() {
     { title: "Đơn Hàng Mới", value: "142", change: "+5.2%", isPositive: true, icon: Package },
     { title: "Khách Hàng Mới", value: "86", change: "-2.4%", isPositive: false, icon: Users },
     { title: "Tỷ Lệ Chuyển Đổi", value: "3.2%", change: "+1.1%", isPositive: true, icon: Activity },
+  ];
+
+  const revenueData = [
+    { name: 'T2', revenue: 120000000 },
+    { name: 'T3', revenue: 150000000 },
+    { name: 'T4', revenue: 180000000 },
+    { name: 'T5', revenue: 140000000 },
+    { name: 'T6', revenue: 210000000 },
+    { name: 'T7', revenue: 250000000 },
+    { name: 'CN', revenue: 324500000 },
   ];
 
   return (
@@ -41,9 +52,35 @@ export default function AdminDashboardPage() {
       {/* Charts & Tables Placeholder */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white rounded-lg border border-zinc-200 p-6 shadow-sm min-h-[400px]">
-          <h3 className="font-semibold text-zinc-900 mb-4">Biểu đồ doanh thu</h3>
-          <div className="w-full h-full flex items-center justify-center text-zinc-400 bg-zinc-50 rounded border border-dashed border-zinc-200 min-h-[300px]">
-             (Dữ liệu biểu đồ Chart.js / Recharts sẽ được Render ở đây)
+          <h3 className="font-semibold text-zinc-900 mb-4">Biểu đồ doanh thu (7 ngày qua)</h3>
+          <div className="w-full h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={revenueData}
+                margin={{ top: 10, right: 10, left: 20, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#18181b" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#18181b" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#71717a', fontSize: 12}} dy={10} />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{fill: '#71717a', fontSize: 12}}
+                  tickFormatter={(value) => `${value / 1000000}tr`}
+                  dx={-10}
+                />
+                <Tooltip 
+                  formatter={(value: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value)}
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #e4e4e7', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                />
+                <Area type="monotone" dataKey="revenue" stroke="#18181b" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </div>
         
