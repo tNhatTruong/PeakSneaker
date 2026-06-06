@@ -1,4 +1,3 @@
-// File: backend/src/main/java/com/peaksneaker/dto/request/LoginRequest.java
 package com.peaksneaker.dto.request;
 
 import jakarta.validation.constraints.Email;

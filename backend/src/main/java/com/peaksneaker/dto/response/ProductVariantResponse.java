@@ -4,16 +4,18 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.math.BigDecimal;
-import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CartResponse {
+public class ProductVariantResponse {
     private Long id;
-    private List<CartItemResponse> items;
-    private Integer totalQuantity;
-    private BigDecimal totalPrice;
+    private String color;
+    private String size;
+    private Integer stock;
+    private BigDecimal priceMultiplier;
+    private BigDecimal finalPrice;
 }

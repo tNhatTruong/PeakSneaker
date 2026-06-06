@@ -1,4 +1,3 @@
-// File: backend/src/main/java/com/peaksneaker/service/CartService.java
 package com.peaksneaker.service;
 
 import com.peaksneaker.dto.request.AddToCartRequest;
