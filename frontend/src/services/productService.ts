@@ -16,7 +16,51 @@ export interface ProductResponse {
   isNew: boolean;
 }
 
+export interface ImageResponse {
+  id: number;
+  imageUrl: string;
+  isPrimary: boolean;
+}
+
+export interface ProductVariantResponse {
+  id: number;
+  color: string;
+  size: string;
+  stock: number;
+  priceMultiplier: number;
+  finalPrice: number;
+}
+
+export interface CategoryResponse {
+  id: number;
+  name: string;
+}
+
+export interface SilhouetteResponse {
+  id: number;
+  name: string;
+}
+
+export interface ProductDetailResponse {
+  id: number;
+  name: string;
+  description: string;
+  basePrice: number;
+  brand: BrandResponse | null;
+  category: CategoryResponse | null;
+  silhouette: SilhouetteResponse | null;
+  isFeatured: boolean;
+  isNew: boolean;
+  images: ImageResponse[];
+  variants: ProductVariantResponse[];
+}
+
 export const ProductService = {
+  getProductById: async (id: number) => {
+    const response = await apiClient.get<ApiResponse<ProductDetailResponse>>(`/products/${id}`);
+    // @ts-ignore
+    return response.data as ProductDetailResponse;
+  },
   getFeaturedProducts: async (limit: number = 8) => {
     const response = await apiClient.get<ApiResponse<ProductResponse[]>>('/products/featured', {
       params: { limit },

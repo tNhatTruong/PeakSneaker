@@ -33,6 +33,13 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách sản phẩm mới thành công", products));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<com.peaksneaker.dto.response.ProductDetailResponse>> getProductById(
+            @org.springframework.web.bind.annotation.PathVariable Long id) {
+        com.peaksneaker.dto.response.ProductDetailResponse product = productService.getProductById(id);
+        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin chi tiết sản phẩm thành công", product));
+    }
+
     @GetMapping
     public ResponseEntity<ApiResponse<com.peaksneaker.dto.response.PaginatedResponse<ProductResponse>>> filterProducts(
             @RequestParam(required = false) Long categoryId,
