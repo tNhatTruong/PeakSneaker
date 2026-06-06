@@ -1,20 +1,32 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CreditCard, Banknote, MapPin, Package, ShieldCheck } from "lucide-react";
+import { useCart } from "../../context/CartContext";
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 
 export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState("vnpay");
+  const { cart, loading } = useCart();
+  const navigate = useNavigate();
 
-  // Mock Cart Items
-  const cartItems = [
-    { id: "1", name: "Jordan 1 Retro High OG", size: "42", color: "Đỏ/Đen", price: 5490000, quantity: 1, imageUrl: "https://images.unsplash.com/photo-1605340537586-0a5a228fdd64?auto=format&fit=crop&q=80&w=150" },
-    { id: "2", name: "Nike Air Force 1 '07", size: "41", color: "Trắng", price: 2990000, quantity: 1, imageUrl: "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&q=80&w=150" },
-  ];
+  useEffect(() => {
+    if (!loading && (!cart || cart.items.length === 0)) {
+      toast.error("Giỏ hàng của bạn đang trống.");
+      navigate("/shop");
+    }
+  }, [cart, loading, navigate]);
 
-  const subtotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  const shippingFee = 50000;
+  const cartItems = cart?.items || [];
+  const subtotal = cart?.totalPrice || 0;
+  const shippingFee = 30000; // Fixed shipping fee as per backend logic
   const total = subtotal + shippingFee;
 
   const formatPrice = (price: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
+
+  const handleCheckout = (e: React.FormEvent) => {
+    e.preventDefault();
+    toast.success("Đã ghi nhận thông tin! Tính năng thanh toán và tạo đơn hàng đang được phát triển.");
+  };
 
   return (
     <div className="bg-zinc-50 min-h-screen py-10">
@@ -128,10 +140,10 @@ export default function CheckoutPage() {
                 {cartItems.map((item) => (
                   <div key={item.id} className="flex items-center gap-4">
                     <div className="w-16 h-16 bg-zinc-100 flex-shrink-0">
-                      <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover mix-blend-multiply" />
+                      <img src={item.productThumbnail || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=200"} alt={item.productName} className="w-full h-full object-cover mix-blend-multiply" />
                     </div>
                     <div className="flex-1">
-                      <h4 className="text-sm font-bold text-zinc-900 line-clamp-1">{item.name}</h4>
+                      <h4 className="text-sm font-bold text-zinc-900 line-clamp-1">{item.productName}</h4>
                       <p className="text-xs text-zinc-500 mt-0.5">Size: {item.size} | Màu: {item.color}</p>
                       <div className="flex justify-between items-center mt-1">
                         <span className="text-xs font-semibold text-zinc-500">x{item.quantity}</span>
@@ -171,7 +183,10 @@ export default function CheckoutPage() {
               </div>
 
               {/* Submit Button */}
-              <button className="w-full bg-zinc-900 text-white py-4 font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors flex justify-center items-center">
+              <button 
+                onClick={handleCheckout}
+                className="w-full bg-zinc-900 text-white py-4 font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors flex justify-center items-center"
+              >
                 {paymentMethod === 'vnpay' ? 'Thanh toán qua VNPAY' : 'Hoàn tất đặt hàng'}
               </button>
 
