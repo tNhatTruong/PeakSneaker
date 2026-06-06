@@ -25,7 +25,17 @@ public class Product {
     @Column(nullable = false)
     private String name;
 
-    private String brand;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "brand_id")
+    private Brand brand;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "silhouette_id")
+    private Silhouette silhouette;
+
+    @Column(name = "is_featured", nullable = false)
+    @Builder.Default
+    private Boolean isFeatured = false;
 
     @Column(columnDefinition = "text")
     private String description;
