@@ -13,6 +13,8 @@ DROP TABLE IF EXISTS carts CASCADE;
 DROP TABLE IF EXISTS images CASCADE;
 DROP TABLE IF EXISTS product_variants CASCADE;
 DROP TABLE IF EXISTS products CASCADE;
+DROP TABLE IF EXISTS silhouettes CASCADE;
+DROP TABLE IF EXISTS brands CASCADE;
 DROP TABLE IF EXISTS categories CASCADE;
 DROP TABLE IF EXISTS addresses CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
@@ -66,18 +68,44 @@ CREATE TABLE categories
 );
 
 -- =========================================================
+-- BRANDS
+-- =========================================================
+CREATE TABLE brands
+(
+    id          BIGSERIAL PRIMARY KEY,
+    name        varchar(255) UNIQUE NOT NULL,
+    logo_url    varchar(500),
+    description text,
+    is_deleted  boolean NOT NULL DEFAULT FALSE
+);
+
+-- =========================================================
+-- SILHOUETTES
+-- =========================================================
+CREATE TABLE silhouettes
+(
+    id          BIGSERIAL PRIMARY KEY,
+    name        varchar(255) NOT NULL,
+    image_url   varchar(500),
+    brand_id    bigint NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+    is_deleted  boolean NOT NULL DEFAULT FALSE
+);
+
+-- =========================================================
 -- PRODUCTS
 -- =========================================================
 CREATE TABLE products
 (
     id           BIGSERIAL PRIMARY KEY,
     category_id  bigint         REFERENCES categories (id) ON DELETE SET NULL,
+    brand_id     bigint         REFERENCES brands (id) ON DELETE SET NULL,
+    silhouette_id bigint        REFERENCES silhouettes (id) ON DELETE SET NULL,
     name         varchar(255)   NOT NULL,
-    brand        varchar(255),
     description  text,
     base_price   decimal(12, 2) NOT NULL,
     gender       varchar(50),
     product_type varchar(50)    NOT NULL,
+    is_featured  boolean        NOT NULL DEFAULT FALSE,
     is_deleted   boolean        NOT NULL DEFAULT FALSE,
     created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -222,7 +250,7 @@ CREATE INDEX idx_payments_order ON payments (order_id);
 
 
 -- XÓA SẠCH DỮ LIỆU CŨ TRƯỚC KHI SEED (đảm bảo id không bị rối)
-TRUNCATE TABLE order_items, payments, orders, cart_items, carts, images, product_variants, products, categories, addresses, users, vouchers RESTART IDENTITY CASCADE;
+TRUNCATE TABLE order_items, payments, orders, cart_items, carts, images, product_variants, products, silhouettes, brands, categories, addresses, users, vouchers RESTART IDENTITY CASCADE;
 
 -- 1. SEED USERS (Mật khẩu mặc định: 123456 -> BCrypt: $2a$10$wZJ4e.8a8.lFv/yqR1XoZ.b6s5y6.9Qh2L.h6Qy8Pq.2V5e0h4u9e)
 INSERT INTO users (email, password_hash, first_name, last_name, phone, role, is_verified, is_active)
@@ -251,13 +279,31 @@ VALUES
 ('Giày Nữ', 'giay-nu', 'Bộ sưu tập giày thể thao dành cho nữ'),
 ('Phụ Kiện', 'phu-kien', 'Tất, dây giày, bình nước, balo...');
 
--- 5. SEED PRODUCTS
-INSERT INTO products (category_id, name, brand, description, base_price, gender, product_type, is_deleted, created_at)
+-- 4.1 SEED BRANDS
+INSERT INTO brands (name, logo_url, description)
 VALUES
-(1, 'Nike Air Force 1 07', 'Nike', 'Huyền thoại bóng rổ đường phố, thiết kế cổ điển vượt thời gian.', 2500000, 'UNISEX', 'SNEAKER', false, CURRENT_TIMESTAMP),
-(1, 'Adidas Ultraboost Light', 'Adidas', 'Siêu nhẹ, công nghệ đệm BOOST phản hồi lực cực tốt.', 4500000, 'MALE', 'RUNNING', false, CURRENT_TIMESTAMP),
-(1, 'Air Jordan 1 Retro High OG', 'Nike', 'Đôi giày thay đổi lịch sử dòng Air Jordan.', 6000000, 'MALE', 'SNEAKER', false, CURRENT_TIMESTAMP),
-(3, 'Tất Nike Everyday Plus Cushion', 'Nike', 'Tất cổ trung êm ái, thấm hút mồ hôi.', 200000, 'UNISEX', 'ACCESSORY', false, CURRENT_TIMESTAMP);
+('Nike', 'https://upload.wikimedia.org/wikipedia/commons/a/a6/Logo_NIKE.svg', 'Classic silhouettes and cutting-edge innovation.'),
+('Adidas', 'https://upload.wikimedia.org/wikipedia/commons/2/20/Adidas_Logo.svg', 'Sự giao thoa hoàn hảo giữa thể thao chuyên nghiệp và thời trang đường phố.'),
+('New Balance', 'https://upload.wikimedia.org/wikipedia/commons/e/ea/New_Balance_logo.svg', 'Vẻ đẹp Dad Shoe cổ điển vượt thời gian kết hợp cùng sự thoải mái tối đa.');
+
+-- 4.2 SEED SILHOUETTES
+INSERT INTO silhouettes (name, image_url, brand_id) 
+VALUES 
+('Air Jordan 1', 'https://images.unsplash.com/photo-1605340537586-0a5a228fdd64?auto=format&fit=crop&q=80&w=300', 1), 
+('Air Force 1', 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&q=80&w=300', 1), 
+('Dunk', 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&q=80&w=300', 1), 
+('Air Max', 'https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?auto=format&fit=crop&q=80&w=300', 1), 
+('Yeezy Boost', 'https://images.unsplash.com/photo-1620012253295-c15ce331ff61?auto=format&fit=crop&q=80&w=300', 2), 
+('Samba', 'https://images.unsplash.com/photo-1588117305388-c2631a279f82?auto=format&fit=crop&q=80&w=300', 2);
+
+-- 5. SEED PRODUCTS
+INSERT INTO products (category_id, brand_id, silhouette_id, name, description, base_price, gender, product_type, is_featured, is_deleted, created_at)
+VALUES
+(1, 1, 2, 'Nike Air Force 1 07', 'Huyền thoại bóng rổ đường phố, thiết kế cổ điển vượt thời gian.', 2500000, 'UNISEX', 'SNEAKER', true, false, CURRENT_TIMESTAMP),
+(1, 2, NULL, 'Adidas Ultraboost Light', 'Siêu nhẹ, công nghệ đệm BOOST phản hồi lực cực tốt.', 4500000, 'MALE', 'RUNNING', true, false, CURRENT_TIMESTAMP),
+(1, 1, 1, 'Air Jordan 1 Retro High OG', 'Đôi giày thay đổi lịch sử dòng Air Jordan.', 6000000, 'MALE', 'SNEAKER', true, false, CURRENT_TIMESTAMP),
+(1, 3, NULL, 'New Balance 550', 'Thiết kế vintage thập niên 80s siêu dễ phối đồ.', 3290000, 'UNISEX', 'SNEAKER', true, false, CURRENT_TIMESTAMP),
+(3, 1, NULL, 'Tất Nike Everyday Plus Cushion', 'Tất cổ trung êm ái, thấm hút mồ hôi.', 200000, 'UNISEX', 'ACCESSORY', false, false, CURRENT_TIMESTAMP);
 
 -- 6. SEED PRODUCT VARIANTS
 INSERT INTO product_variants (product_id, sku, color, size, stock_quantity, price_adjustment)
@@ -274,11 +320,11 @@ VALUES
 -- 7. SEED IMAGES
 INSERT INTO images (product_id, product_variant_id, image_name, is_primary)
 VALUES
-(1, 1, 'https://static.nike.com/a/images/t_PDP_1728_v1/f_auto,q_auto:eco/b7d9211c-26e7-431a-ac24-b0540fb3c00f/air-force-1-07-mens-shoes-jBrhbr.png', true),
-(1, 3, 'https://static.nike.com/a/images/t_PDP_1728_v1/f_auto,q_auto:eco/fc4622c4-2769-4665-aa6e-42c974a7705e/air-force-1-07-mens-shoes-jBrhbr.png', false),
-(2, 4, 'https://assets.adidas.com/images/h_840,f_auto,q_auto,fl_lossy,c_fill,g_auto/c6fb58661ed2464789d3af0700c25a07_9366/Giay_Ultraboost_Light_Djen_HQ6339_01_standard.jpg', true),
-(3, 6, 'https://static.nike.com/a/images/t_PDP_1728_v1/f_auto,q_auto:eco/98e3b092-2cc3-4eec-b5c6-c95696144e5d/air-jordan-1-retro-high-og-shoes-a7Zzrw.png', true),
-(4, 8, 'https://static.nike.com/a/images/t_PDP_1728_v1/f_auto,q_auto:eco/60451cf1-450f-48d8-becd-fc581179ab68/everyday-plus-cushioned-crew-socks-3-pairs-pMWMJ7.png', true);
+(1, 1, 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&q=80&w=600', true),
+(1, 3, 'https://images.unsplash.com/photo-1605340537586-0a5a228fdd64?auto=format&fit=crop&q=80&w=600', false),
+(2, 4, 'https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&q=80&w=600', true),
+(3, 6, 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&q=80&w=600', true),
+(4, 8, 'https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&q=80&w=600', true);
 
 -- 8. SEED CARTS & CART ITEMS
 INSERT INTO carts (user_id) VALUES (2), (3);
