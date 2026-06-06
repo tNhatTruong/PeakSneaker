@@ -1,11 +1,32 @@
 import { ShoppingBag, Search, Menu, User, X } from "lucide-react";
-import { Link } from "react-router-dom";
-import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import CartDrawer from "../customer/CartDrawer";
+import { useCart } from "../../context/CartContext";
 
 export default function Header() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { itemCount } = useCart();
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("token"));
+  const [userName, setUserName] = useState(localStorage.getItem("fullName") || "");
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setIsLoggedIn(!!localStorage.getItem("token"));
+      setUserName(localStorage.getItem("fullName") || "");
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("fullName");
+    window.dispatchEvent(new Event("storage"));
+    navigate("/login");
+  };
 
   return (
     <>
@@ -40,14 +61,49 @@ export default function Header() {
               <button className="p-2 text-zinc-900 hover:text-zinc-600 transition-colors hidden md:block">
                 <Search className="h-5 w-5" />
               </button>
-              <Link to="/profile" className="p-2 text-zinc-900 hover:text-zinc-600 transition-colors" title="Tài khoản cá nhân">
-                <User className="h-5 w-5" />
-              </Link>
+              
+              {isLoggedIn ? (
+                <div className="relative group">
+                  <Link 
+                    to="/profile" 
+                    className="flex items-center space-x-1 p-2 text-zinc-900 hover:text-zinc-600 transition-colors" 
+                    title="Tài khoản cá nhân"
+                  >
+                    <User className="h-5 w-5" />
+                    <span className="text-sm font-medium hidden md:block">
+                      {userName.split(" ").pop()}
+                    </span>
+                  </Link>
+                  <div className="absolute right-0 w-48 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                    <div className="bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 py-1">
+                      <Link to="/profile" className="block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100">Hồ sơ của tôi</Link>
+                      <Link to="/orders" className="block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100">Đơn mua</Link>
+                      <button 
+                        onClick={handleLogout}
+                        className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                      >
+                        Đăng xuất
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Link 
+                  to="/login" 
+                  className="p-2 text-zinc-900 hover:text-zinc-600 transition-colors" 
+                  title="Đăng nhập"
+                >
+                  <User className="h-5 w-5" />
+                </Link>
+              )}
+
               <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-zinc-900 hover:text-zinc-600 transition-colors" title="Giỏ hàng">
                 <ShoppingBag className="h-5 w-5" />
-                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold text-white">
-                  3
-                </span>
+                {itemCount > 0 && (
+                  <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold text-white">
+                    {itemCount}
+                  </span>
+                )}
               </button>
             </div>
           </div>
