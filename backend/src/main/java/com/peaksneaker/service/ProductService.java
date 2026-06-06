@@ -12,6 +12,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import com.peaksneaker.dto.response.CategoryResponse;
+import com.peaksneaker.dto.response.SilhouetteResponse;
+import com.peaksneaker.dto.response.ImageResponse;
+import com.peaksneaker.dto.response.ProductDetailResponse;
+import com.peaksneaker.dto.response.ProductVariantResponse;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -66,6 +71,17 @@ public class ProductService {
         return page.getContent().stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
+    public ProductDetailResponse getProductById(Long id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy sản phẩm có ID: " + id));
+        
+        if (product.getIsDeleted() != null && product.getIsDeleted()) {
+            throw new IllegalArgumentException("Sản phẩm đã bị xóa.");
+        }
+
+        return mapToDetailResponse(product);
+    }
+
     private ProductResponse mapToResponse(Product product) {
         String defaultImage = product.getImages().stream()
                 .filter(Image::getIsPrimary)
@@ -93,6 +109,68 @@ public class ProductService {
                 .defaultImageUrl(defaultImage)
                 .isFeatured(product.getIsFeatured())
                 .isNew(isNew)
+                .build();
+    }
+
+    private ProductDetailResponse mapToDetailResponse(Product product) {
+        BrandResponse brandResponse = null;
+        if (product.getBrand() != null) {
+            brandResponse = BrandResponse.builder()
+                    .id(product.getBrand().getId())
+                    .name(product.getBrand().getName())
+                    .logoUrl(product.getBrand().getLogoUrl())
+                    .build();
+        }
+
+        CategoryResponse categoryResponse = null;
+        if (product.getCategory() != null) {
+            categoryResponse = CategoryResponse.builder()
+                    .id(product.getCategory().getId())
+                    .name(product.getCategory().getName())
+                    .build();
+        }
+
+        SilhouetteResponse silhouetteResponse = null;
+        if (product.getSilhouette() != null) {
+            silhouetteResponse = SilhouetteResponse.builder()
+                    .id(product.getSilhouette().getId())
+                    .name(product.getSilhouette().getName())
+                    .build();
+        }
+
+        List<ImageResponse> imageResponses = product.getImages().stream()
+                .map(img -> ImageResponse.builder()
+                        .id(img.getId())
+                        .imageUrl(img.getImageUrl())
+                        .isPrimary(img.getIsPrimary())
+                        .build())
+                .collect(Collectors.toList());
+
+        List<ProductVariantResponse> variantResponses = product.getVariants().stream()
+                .map(variant -> ProductVariantResponse.builder()
+                        .id(variant.getId())
+                        .color(variant.getColor())
+                        .size(variant.getSize())
+                        .stock(variant.getStockQuantity())
+                        .priceMultiplier(variant.getPriceAdjustment())
+                        .finalPrice(variant.getFinalPrice())
+                        .build())
+                .collect(Collectors.toList());
+
+        boolean isNew = product.getCreatedAt().isAfter(Instant.now().minus(7, ChronoUnit.DAYS));
+
+        return ProductDetailResponse.builder()
+                .id(product.getId())
+                .name(product.getName())
+                .description(product.getDescription())
+                .basePrice(product.getBasePrice())
+                .brand(brandResponse)
+                .category(categoryResponse)
+                .silhouette(silhouetteResponse)
+                .isFeatured(product.getIsFeatured())
+                .isNew(isNew)
+                .images(imageResponses)
+                .variants(variantResponses)
                 .build();
     }
 }

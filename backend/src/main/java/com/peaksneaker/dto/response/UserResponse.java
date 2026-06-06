@@ -1,4 +1,3 @@
-// File: backend/src/main/java/com/peaksneaker/dto/response/UserResponse.java
 package com.peaksneaker.dto.response;
 
 import lombok.AllArgsConstructor;
