@@ -10,9 +10,15 @@ import java.util.Optional;
 @Repository
 public interface ImageRepository extends JpaRepository<Image, Long> {
 
-    List<Image> findByReferenceTypeAndReferenceId(String referenceType, Long referenceId);
+    List<Image> findByProductId(Long productId);
 
-    Optional<Image> findByReferenceTypeAndReferenceIdAndIsPrimaryTrue(String referenceType, Long referenceId);
+    List<Image> findByProductVariantId(Long variantId);
 
-    void deleteByReferenceTypeAndReferenceId(String referenceType, Long referenceId);
+    Optional<Image> findByProductIdAndIsPrimaryTrue(Long productId);
+
+    Optional<Image> findByProductVariantIdAndIsPrimaryTrue(Long variantId);
+
+    void deleteByProductId(Long productId);
+
+    void deleteByProductVariantId(Long variantId);
 }
