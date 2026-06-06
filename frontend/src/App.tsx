@@ -25,9 +25,12 @@ import AdminProductsPage from "./pages/admin/AdminProductsPage";
 import AdminInventoryPage from "./pages/admin/AdminInventoryPage";
 import AdminVouchersPage from "./pages/admin/AdminVouchersPage";
 
+import ScrollToTop from "./components/common/ScrollToTop";
+
 function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         <Route path="/" element={<Layout />}>
           {/* Các trang dành cho Khách hàng */}
