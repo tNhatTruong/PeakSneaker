@@ -37,7 +37,7 @@ function App() {
           {/* Các trang dành cho Khách hàng */}
           <Route index element={<HomePage />} />
           <Route path="shop" element={<ShopPage />} />
-          <Route path="product/:id" element={<ProductDetailPage />} />
+          <Route path="products/:id" element={<ProductDetailPage />} />
           <Route path="checkout" element={<CheckoutPage />} />
           <Route path="orders" element={<OrderHistoryPage />} />
           <Route path="brands" element={<BrandsPage />} />
