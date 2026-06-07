@@ -1,15 +1,21 @@
 package com.peaksneaker.service;
 
+import com.peaksneaker.config.CloudinaryConfig;
 import com.peaksneaker.dto.response.BrandResponse;
 import com.peaksneaker.dto.response.PaginatedResponse;
 import com.peaksneaker.dto.response.ProductResponse;
 import com.peaksneaker.entity.Image;
 import com.peaksneaker.entity.Product;
 import com.peaksneaker.repository.ProductRepository;
+import com.peaksneaker.repository.specification.ProductSpecification;
+import com.peaksneaker.service.cloudservice.CloudinaryService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import com.peaksneaker.dto.response.CategoryResponse;
@@ -27,10 +33,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class ProductService {
 
-    @Autowired
-    private ProductRepository productRepository;
+    private final ProductRepository productRepository;
+    private final CloudinaryService cloudinaryService;
 
     public PaginatedResponse<ProductResponse> filterProducts(
             Long categoryId,
@@ -44,15 +51,11 @@ public class ProductService {
             String sortBy,
             String sortDirection
     ) {
-        org.springframework.data.domain.Sort.Direction direction = sortDirection.equalsIgnoreCase("desc") ? 
-                org.springframework.data.domain.Sort.Direction.DESC : 
-                org.springframework.data.domain.Sort.Direction.ASC;
+        Sort.Direction direction = sortDirection.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
                 
-        Pageable pageable = PageRequest.of(page, size, org.springframework.data.domain.Sort.by(direction, sortBy));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
 
-        org.springframework.data.jpa.domain.Specification<Product> spec = 
-                com.peaksneaker.repository.specification.ProductSpecification.filterProducts(
-                        categoryId, brandId, silhouetteId, minPrice, maxPrice, search);
+        Specification<Product> spec = ProductSpecification.filterProducts(categoryId, brandId, silhouetteId, minPrice, maxPrice, search);
 
         Page<Product> productPage = productRepository.findAll(spec, pageable);
 
@@ -85,9 +88,9 @@ public class ProductService {
     private ProductResponse mapToResponse(Product product) {
         String defaultImage = product.getImages().stream()
                 .filter(Image::getIsPrimary)
-                .map(Image::getImageUrl)
+                .map(Image::getImageName)
                 .findFirst()
-                .orElse(product.getImages().isEmpty() ? null : product.getImages().get(0).getImageUrl());
+                .orElse(product.getImages().isEmpty() ? null : product.getImages().get(0).getImageName());
 
         BrandResponse brandResponse = null;
         if (product.getBrand() != null) {
@@ -106,7 +109,7 @@ public class ProductService {
                 .name(product.getName())
                 .brand(brandResponse)
                 .basePrice(product.getBasePrice())
-                .defaultImageUrl(defaultImage)
+                .defaultImageUrl(cloudinaryService.creteImageUrl(defaultImage))
                 .isFeatured(product.getIsFeatured())
                 .isNew(isNew)
                 .build();
@@ -141,7 +144,7 @@ public class ProductService {
         List<ImageResponse> imageResponses = product.getImages().stream()
                 .map(img -> ImageResponse.builder()
                         .id(img.getId())
-                        .imageUrl(img.getImageUrl())
+                        .imageUrl(cloudinaryService.creteImageUrl(img.getImageName()))
                         .isPrimary(img.getIsPrimary())
                         .build())
                 .collect(Collectors.toList());

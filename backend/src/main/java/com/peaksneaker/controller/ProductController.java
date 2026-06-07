@@ -3,6 +3,7 @@ package com.peaksneaker.controller;
 import com.peaksneaker.dto.response.ApiResponse;
 import com.peaksneaker.dto.response.ProductResponse;
 import com.peaksneaker.service.ProductService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,10 +15,10 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/products")
+@RequiredArgsConstructor
 public class ProductController {
 
-    @Autowired
-    private ProductService productService;
+    private final ProductService productService;
 
     @GetMapping("/featured")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> getFeaturedProducts(
