@@ -3,11 +3,32 @@ import { CreditCard, Banknote, MapPin, Package, ShieldCheck } from "lucide-react
 import { useCart } from "../../context/CartContext";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { getProvinces, getDistricts, getWards, calculateFee } from "../../services/shippingService";
+import type { Province, District, Ward } from "../../services/shippingService";
+import { createAddress } from "../../services/addressService";
+import { checkout } from "../../services/orderService";
 
 export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState("vnpay");
   const { cart, loading } = useCart();
   const navigate = useNavigate();
+
+  // Shipping Form State
+  const [recipientName, setRecipientName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [streetDetail, setStreetDetail] = useState("");
+  const [note, setNote] = useState("");
+
+  const [provinces, setProvinces] = useState<Province[]>([]);
+  const [districts, setDistricts] = useState<District[]>([]);
+  const [wards, setWards] = useState<Ward[]>([]);
+
+  const [selectedProvince, setSelectedProvince] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [selectedWard, setSelectedWard] = useState("");
+
+  const [shippingFee, setShippingFee] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!loading && (!cart || cart.items.length === 0)) {
@@ -16,16 +37,124 @@ export default function CheckoutPage() {
     }
   }, [cart, loading, navigate]);
 
+  useEffect(() => {
+    // Load Provinces on mount
+    getProvinces().then((res) => {
+      if (res && res.data) {
+        setProvinces(res.data);
+      }
+    }).catch(err => console.error(err));
+  }, []);
+
+  const handleProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const provinceId = e.target.value;
+    setSelectedProvince(provinceId);
+    setSelectedDistrict("");
+    setSelectedWard("");
+    setWards([]);
+    setShippingFee(0);
+    
+    if (provinceId) {
+      getDistricts(parseInt(provinceId)).then((res) => {
+        if (res && res.data) setDistricts(res.data);
+      }).catch(err => console.error(err));
+    } else {
+      setDistricts([]);
+    }
+  };
+
+  const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const districtId = e.target.value;
+    setSelectedDistrict(districtId);
+    setSelectedWard("");
+    setShippingFee(0);
+
+    if (districtId) {
+      getWards(parseInt(districtId)).then((res) => {
+        if (res && res.data) setWards(res.data);
+      }).catch(err => console.error(err));
+    } else {
+      setWards([]);
+    }
+  };
+
+  const handleWardChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const wardCode = e.target.value;
+    setSelectedWard(wardCode);
+
+    if (selectedDistrict && wardCode) {
+      calculateFee(parseInt(selectedDistrict), wardCode).then((res) => {
+        if (res && res.data && res.data.total) {
+          setShippingFee(res.data.total);
+        }
+      }).catch(err => {
+        console.error(err);
+        setShippingFee(30000); // Fallback
+      });
+    }
+  };
+
   const cartItems = cart?.items || [];
   const subtotal = cart?.totalPrice || 0;
-  const shippingFee = 30000; // Fixed shipping fee as per backend logic
   const total = subtotal + shippingFee;
 
   const formatPrice = (price: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
 
-  const handleCheckout = (e: React.FormEvent) => {
+  const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Đã ghi nhận thông tin! Tính năng thanh toán và tạo đơn hàng đang được phát triển.");
+    if (!recipientName || !phone || !selectedProvince || !selectedDistrict || !selectedWard || !streetDetail) {
+      toast.error("Vui lòng điền đầy đủ thông tin giao hàng!");
+      return;
+    }
+
+    setIsSubmitting(true);
+    const toastId = toast.loading("Đang xử lý đơn hàng...");
+
+    try {
+      // 1. Create Address
+      const provinceName = provinces.find(p => p.ProvinceID.toString() === selectedProvince)?.ProvinceName || "";
+      const districtName = districts.find(d => d.DistrictID.toString() === selectedDistrict)?.DistrictName || "";
+      const wardName = wards.find(w => w.WardCode === selectedWard)?.WardName || "";
+
+      const addressData = {
+        recipientName,
+        phone,
+        provinceId: selectedProvince,
+        provinceName,
+        districtId: selectedDistrict,
+        districtName,
+        wardId: selectedWard,
+        wardName,
+        streetDetail,
+        isDefault: true
+      };
+
+      const addressRes = await createAddress(addressData);
+      const addressId = addressRes.data.id;
+
+      // 2. Checkout
+      const checkoutReq = {
+        addressId,
+        paymentMethod,
+        note
+      };
+
+      const checkoutRes = await checkout(checkoutReq);
+      
+      if (checkoutRes.data.paymentUrl) {
+        toast.success("Chuyển hướng đến trang thanh toán...", { id: toastId });
+        window.location.href = checkoutRes.data.paymentUrl;
+      } else {
+        toast.success("Đặt hàng thành công!", { id: toastId });
+        navigate("/orders");
+      }
+
+    } catch (error) {
+      console.error(error);
+      toast.error("Đã xảy ra lỗi khi đặt hàng.", { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -48,24 +177,51 @@ export default function CheckoutPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Họ & Tên</label>
-                    <input type="text" className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:bg-white focus:border-zinc-900 focus:ring-0 outline-none transition-colors" placeholder="Nguyễn Văn A" />
+                    <input type="text" value={recipientName} onChange={e => setRecipientName(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:bg-white focus:border-zinc-900 focus:ring-0 outline-none transition-colors" placeholder="Nguyễn Văn A" />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Số điện thoại</label>
-                    <input type="text" className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:bg-white focus:border-zinc-900 focus:ring-0 outline-none transition-colors" placeholder="0909 123 456" />
+                    <input type="text" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:bg-white focus:border-zinc-900 focus:ring-0 outline-none transition-colors" placeholder="0909 123 456" />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Địa chỉ Email</label>
-                  <input type="email" className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:bg-white focus:border-zinc-900 focus:ring-0 outline-none transition-colors" placeholder="email@example.com" />
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Tỉnh/Thành phố</label>
+                    <select value={selectedProvince} onChange={handleProvinceChange} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:bg-white focus:border-zinc-900 outline-none">
+                      <option value="">Chọn Tỉnh/Thành</option>
+                      {provinces.map(p => (
+                        <option key={p.ProvinceID} value={p.ProvinceID}>{p.ProvinceName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Quận/Huyện</label>
+                    <select value={selectedDistrict} onChange={handleDistrictChange} disabled={!selectedProvince} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:bg-white focus:border-zinc-900 outline-none disabled:opacity-50">
+                      <option value="">Chọn Quận/Huyện</option>
+                      {districts.map(d => (
+                        <option key={d.DistrictID} value={d.DistrictID}>{d.DistrictName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Phường/Xã</label>
+                    <select value={selectedWard} onChange={handleWardChange} disabled={!selectedDistrict} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:bg-white focus:border-zinc-900 outline-none disabled:opacity-50">
+                      <option value="">Chọn Phường/Xã</option>
+                      {wards.map(w => (
+                        <option key={w.WardCode} value={w.WardCode}>{w.WardName}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
+
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Địa chỉ chi tiết</label>
-                  <input type="text" className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:bg-white focus:border-zinc-900 focus:ring-0 outline-none transition-colors" placeholder="Số nhà, Tên đường, Phường/Xã, Quận/Huyện, Tỉnh/TP" />
+                  <input type="text" value={streetDetail} onChange={e => setStreetDetail(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:bg-white focus:border-zinc-900 focus:ring-0 outline-none transition-colors" placeholder="Số nhà, Tên đường..." />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Ghi chú (Tùy chọn)</label>
-                  <textarea rows={3} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:bg-white focus:border-zinc-900 focus:ring-0 outline-none transition-colors" placeholder="Ghi chú thêm cho người giao hàng..."></textarea>
+                  <textarea rows={3} value={note} onChange={e => setNote(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:bg-white focus:border-zinc-900 focus:ring-0 outline-none transition-colors" placeholder="Ghi chú thêm cho người giao hàng..."></textarea>
                 </div>
               </form>
             </div>
@@ -91,7 +247,6 @@ export default function CheckoutPage() {
                     <div className="ml-4 flex-1">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-zinc-900">Thanh toán trực tuyến (VNPAY)</span>
-                        {/* Fake VNPAY Logo Badge */}
                         <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-sm tracking-wider">VNPAY</span>
                       </div>
                       <p className="text-sm text-zinc-500 mt-1">Chuyển hướng đến cổng thanh toán an toàn VNPAY. Hỗ trợ thẻ ATM, Visa, MasterCard và QR Code.</p>
@@ -156,12 +311,6 @@ export default function CheckoutPage() {
 
               <hr className="border-zinc-200 my-6" />
 
-              {/* Coupon Form */}
-              <div className="flex gap-2 mb-6">
-                <input type="text" placeholder="Mã giảm giá..." className="flex-1 px-4 py-2 bg-zinc-50 border border-zinc-200 focus:bg-white focus:border-zinc-900 focus:ring-0 outline-none text-sm" />
-                <button className="bg-zinc-900 text-white px-4 py-2 text-sm font-bold uppercase tracking-wider hover:bg-zinc-800 transition-colors">Áp dụng</button>
-              </div>
-
               {/* Totals */}
               <div className="space-y-3 text-sm mb-6">
                 <div className="flex justify-between text-zinc-600">
@@ -170,9 +319,8 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex justify-between text-zinc-600">
                   <span>Phí vận chuyển</span>
-                  <span className="font-medium text-zinc-900">{formatPrice(shippingFee)}</span>
+                  <span className="font-medium text-zinc-900">{shippingFee > 0 ? formatPrice(shippingFee) : '---'}</span>
                 </div>
-                {/* Giả sử có giảm giá thì hiển thị ở đây */}
               </div>
 
               <hr className="border-zinc-900 my-4 border-t-2" />
@@ -185,9 +333,10 @@ export default function CheckoutPage() {
               {/* Submit Button */}
               <button 
                 onClick={handleCheckout}
-                className="w-full bg-zinc-900 text-white py-4 font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors flex justify-center items-center"
+                disabled={isSubmitting || cartItems.length === 0}
+                className="w-full bg-zinc-900 text-white py-4 font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors flex justify-center items-center disabled:opacity-50"
               >
-                {paymentMethod === 'vnpay' ? 'Thanh toán qua VNPAY' : 'Hoàn tất đặt hàng'}
+                {isSubmitting ? 'Đang xử lý...' : paymentMethod === 'vnpay' ? 'Thanh toán qua VNPAY' : 'Hoàn tất đặt hàng'}
               </button>
 
               <div className="mt-4 flex items-center justify-center text-zinc-400 text-xs gap-1">
