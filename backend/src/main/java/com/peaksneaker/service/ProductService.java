@@ -1,35 +1,25 @@
 package com.peaksneaker.service;
 
-import com.peaksneaker.config.CloudinaryConfig;
-import com.peaksneaker.dto.response.BrandResponse;
-import com.peaksneaker.dto.response.PaginatedResponse;
-import com.peaksneaker.dto.response.ProductResponse;
+import com.peaksneaker.dto.response.*;
 import com.peaksneaker.entity.Image;
 import com.peaksneaker.entity.Product;
 import com.peaksneaker.repository.ProductRepository;
 import com.peaksneaker.repository.specification.ProductSpecification;
 import com.peaksneaker.service.cloudservice.CloudinaryService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import com.peaksneaker.dto.response.CategoryResponse;
-import com.peaksneaker.dto.response.SilhouetteResponse;
-import com.peaksneaker.dto.response.ImageResponse;
-import com.peaksneaker.dto.response.ProductDetailResponse;
-import com.peaksneaker.dto.response.ProductVariantResponse;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.stream.Collectors;
-
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)

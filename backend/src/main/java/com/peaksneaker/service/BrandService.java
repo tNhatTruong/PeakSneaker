@@ -4,13 +4,11 @@ import com.peaksneaker.dto.response.BrandResponse;
 import com.peaksneaker.entity.Brand;
 import com.peaksneaker.repository.BrandRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
-
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
