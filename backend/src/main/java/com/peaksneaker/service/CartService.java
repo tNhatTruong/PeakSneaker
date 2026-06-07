@@ -14,6 +14,7 @@ import com.peaksneaker.repository.CartItemRepository;
 import com.peaksneaker.repository.CartRepository;
 import com.peaksneaker.repository.ProductVariantRepository;
 import com.peaksneaker.repository.UserRepository;
+import com.peaksneaker.service.cloudservice.CloudinaryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,8 @@ public class CartService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final CloudinaryService cloudinaryService;
+
 
     @Transactional(readOnly = true)
     public CartResponse getCart(Long userId) {
@@ -158,9 +161,9 @@ public class CartService {
                     if (product != null && product.getImages() != null) {
                         thumbnail = product.getImages().stream()
                                 .filter(img -> img.getIsPrimary() != null && img.getIsPrimary())
-                                .map(Image::getImageUrl)
+                                .map(Image::getImageName)
                                 .findFirst()
-                                .orElse(product.getImages().isEmpty() ? null : product.getImages().get(0).getImageUrl());
+                                .orElse(product.getImages().isEmpty() ? null : product.getImages().get(0).getImageName());
                     }
 
                     return CartItemResponse.builder()
@@ -174,7 +177,7 @@ public class CartService {
                             .subtotal(item.getSubtotal())
                             .productId(product != null ? product.getId() : null)
                             .productName(product != null ? product.getName() : null)
-                            .productThumbnail(thumbnail)
+                            .productThumbnail(cloudinaryService.creteImageUrl(thumbnail))
                             .stockQuantity(variant != null ? variant.getStockQuantity() : 0)
                             .build();
                 })
