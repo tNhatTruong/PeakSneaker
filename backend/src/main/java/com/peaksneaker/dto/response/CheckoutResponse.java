@@ -1,6 +1,5 @@
 package com.peaksneaker.dto.response;
 
-
 import lombok.Builder;
 import lombok.Data;
 

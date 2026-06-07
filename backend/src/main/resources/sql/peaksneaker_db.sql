@@ -320,11 +320,11 @@ VALUES
 -- 7. SEED IMAGES
 INSERT INTO images (product_id, product_variant_id, image_name, is_primary)
 VALUES
-(1, 1, 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&q=80&w=600', true),
-(1, 3, 'https://images.unsplash.com/photo-1605340537586-0a5a228fdd64?auto=format&fit=crop&q=80&w=600', false),
-(2, 4, 'https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&q=80&w=600', true),
-(3, 6, 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&q=80&w=600', true),
-(4, 8, 'https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&q=80&w=600', true);
+(1, 1, 'photo-1595950653106-6c9ebd614d3a.avif', true),
+(1, 3, 'smart-man.jpg', false),
+(2, 4, 'photo-1608231387042-66d1773070a5.avif', true),
+(3, 6, 'photo-1606107557195-0e29a4b5b4aa.avif', true),
+(4, 8, 'photo-1551028719-00167b16eac5.avif', true);
 
 -- 8. SEED CARTS & CART ITEMS
 INSERT INTO carts (user_id) VALUES (2), (3);

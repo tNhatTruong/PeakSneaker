@@ -13,7 +13,7 @@ export default function ProductCard({ id, name, price, imageUrl, category }: Pro
   const formattedPrice = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
 
   return (
-    <Link to={`/product/${id}`} className="group block">
+    <Link to={`/products/${id}`} className="group block">
       {/* Khung ảnh nền xám nhạt để bóc nền giày trắng */}
       <div className="relative aspect-square overflow-hidden bg-zinc-100 mb-4">
         <img 
