@@ -25,7 +25,7 @@ public class Image {
     private ProductVariant productVariant;
 
     @Column(name = "image_name", nullable = false, length = 500)
-    private String imageUrl;
+    private String imageName;
 
     @Column(name = "is_primary", nullable = false)
     @Builder.Default
