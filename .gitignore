@@ -101,3 +101,6 @@ $RECYCLE.BIN/
 .aider*
 
 .agents
+backend/src/main/resources/application-ghn.properties
+backend/src/main/resources/application-google.properties
+backend/src/main/resources/application-vnpay.properties
