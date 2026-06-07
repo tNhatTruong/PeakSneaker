@@ -14,6 +14,7 @@ import ForgotPasswordPage from "./pages/customer/ForgotPasswordPage";
 import ProfilePage from "./pages/customer/ProfilePage";
 import ProductDetailPage from "./pages/customer/ProductDetailPage";
 import VouchersPage from "./pages/customer/VouchersPage";
+import { VnpayReturnPage } from "./pages/customer/VnpayReturnPage";
 
 // Admin Imports
 import AdminLayout from "./components/admin/AdminLayout";
@@ -45,6 +46,7 @@ function App() {
           <Route path="forgot-password" element={<ForgotPasswordPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="vouchers" element={<VouchersPage />} />
+          <Route path="vnpay-return" element={<VnpayReturnPage />} />
         </Route>
 
         {/* Các trang dành cho Admin */}
