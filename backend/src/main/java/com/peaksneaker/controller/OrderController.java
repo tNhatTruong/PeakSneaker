@@ -5,11 +5,14 @@ import com.peaksneaker.dto.response.ApiResponse;
 import com.peaksneaker.entity.Order;
 import com.peaksneaker.security.UserDetailsImpl;
 import com.peaksneaker.service.OrderService;
+import com.peaksneaker.service.PaymentService;
+import com.peaksneaker.dto.response.CheckoutResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -17,15 +20,32 @@ import org.springframework.web.bind.annotation.*;
 public class OrderController {
 
     private final OrderService orderService;
-
+    private final PaymentService paymentService;
 
     @PostMapping("/checkout")
-    public ResponseEntity<ApiResponse<Order>> checkout(
+    public ResponseEntity<ApiResponse<CheckoutResponse>> checkout(
             @AuthenticationPrincipal UserDetailsImpl userDetails,
-            @Valid @RequestBody CheckoutRequest request) {
+            @Valid @RequestBody CheckoutRequest request,
+            HttpServletRequest httpRequest) {
 
         Order order = orderService.checkout(userDetails.getId(), request);
-        return ResponseEntity.ok(ApiResponse.success("Tạo đơn hàng thành công!", order));
+        String paymentUrl = null;
+
+        if ("vnpay".equalsIgnoreCase(request.getPaymentMethod())) {
+            // Get IP Address from request
+            String ipAddress = httpRequest.getHeader("X-FORWARDED-FOR");
+            if (ipAddress == null) {
+                ipAddress = httpRequest.getRemoteAddr();
+            }
+            paymentUrl = paymentService.createPaymentUrl(order, ipAddress);
+        }
+
+        CheckoutResponse response = CheckoutResponse.builder()
+                .orderId(order.getId())
+                .paymentUrl(paymentUrl)
+                .build();
+
+        return ResponseEntity.ok(ApiResponse.success("Tạo đơn hàng thành công!", response));
     }
 
     @GetMapping
