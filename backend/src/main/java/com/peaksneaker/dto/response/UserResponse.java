@@ -1,5 +1,6 @@
 package com.peaksneaker.dto.response;
 
+import com.peaksneaker.enums.Role;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,5 +15,5 @@ public class UserResponse {
     private String email;
     private String fullName;
     private String phone;
-    private String role;
+    private Role role;
 }

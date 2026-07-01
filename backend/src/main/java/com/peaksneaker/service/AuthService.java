@@ -6,6 +6,7 @@ import com.peaksneaker.dto.response.LoginResponse;
 import com.peaksneaker.dto.response.UserResponse;
 import com.peaksneaker.entity.Cart;
 import com.peaksneaker.entity.User;
+import com.peaksneaker.enums.Role;
 import com.peaksneaker.repository.CartRepository;
 import com.peaksneaker.repository.UserRepository;
 import com.peaksneaker.security.JwtUtils;
@@ -50,7 +51,7 @@ public class AuthService {
                 .firstName(firstName)
                 .lastName(lastName)
                 .phone(request.getPhone().trim())
-                .role("USER")
+                .role(Role.USER)
                 .isActive(true)
                 .isVerified(false)
                 .build();

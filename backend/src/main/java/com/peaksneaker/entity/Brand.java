@@ -27,7 +27,7 @@ public class Brand {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "is_deleted", nullable = false)
+    @Column(name = "is_deleted")
     @Builder.Default
     private Boolean isDeleted = false;
 

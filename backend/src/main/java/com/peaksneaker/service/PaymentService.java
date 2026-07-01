@@ -2,6 +2,7 @@ package com.peaksneaker.service;
 
 import com.peaksneaker.config.VnpayConfig;
 import com.peaksneaker.entity.Order;
+import com.peaksneaker.enums.PaymentStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -116,7 +117,7 @@ public class PaymentService {
                         String orderIdStr = orderInfo.replace("Thanh toan don hang ", "").trim();
                         Long orderId = Long.parseLong(orderIdStr);
                         orderRepository.findById(orderId).ifPresent(order -> {
-                            order.updatePaymentStatus("PAID");
+                            order.updatePaymentStatus(PaymentStatus.PAID);
                             orderRepository.save(order);
                         });
                     }
