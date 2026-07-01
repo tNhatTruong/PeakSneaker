@@ -9,7 +9,7 @@ import { createAddress } from "../../services/addressService";
 import { checkout } from "../../services/orderService";
 
 export default function CheckoutPage() {
-  const [paymentMethod, setPaymentMethod] = useState("vnpay");
+  const [paymentMethod, setPaymentMethod] = useState("VNPAY");
   const { cart, loading } = useCart();
   const navigate = useNavigate();
 
@@ -234,14 +234,14 @@ export default function CheckoutPage() {
               <div className="space-y-4">
                 
                 {/* VNPAY Option */}
-                <label className={`block cursor-pointer border ${paymentMethod === 'vnpay' ? 'border-zinc-900 bg-zinc-50' : 'border-zinc-200'} p-4 transition-all relative overflow-hidden group`}>
+                <label className={`block cursor-pointer border ${paymentMethod === 'VNPAY' ? 'border-zinc-900 bg-zinc-50' : 'border-zinc-200'} p-4 transition-all relative overflow-hidden group`}>
                   <div className="flex items-center">
                     <input 
                       type="radio" 
                       name="payment" 
-                      value="vnpay" 
-                      checked={paymentMethod === 'vnpay'} 
-                      onChange={() => setPaymentMethod('vnpay')}
+                      value="VNPAY" 
+                      checked={paymentMethod === 'VNPAY'} 
+                      onChange={() => setPaymentMethod('VNPAY')}
                       className="form-radio h-5 w-5 text-zinc-900 border-zinc-300 focus:ring-zinc-900"
                     />
                     <div className="ml-4 flex-1">
@@ -252,20 +252,20 @@ export default function CheckoutPage() {
                       <p className="text-sm text-zinc-500 mt-1">Chuyển hướng đến cổng thanh toán an toàn VNPAY. Hỗ trợ thẻ ATM, Visa, MasterCard và QR Code.</p>
                     </div>
                   </div>
-                  {paymentMethod === 'vnpay' && (
+                  {paymentMethod === 'VNPAY' && (
                     <div className="absolute top-0 left-0 w-1 h-full bg-blue-600"></div>
                   )}
                 </label>
 
                 {/* COD Option */}
-                <label className={`block cursor-pointer border ${paymentMethod === 'cod' ? 'border-zinc-900 bg-zinc-50' : 'border-zinc-200'} p-4 transition-all relative overflow-hidden`}>
+                <label className={`block cursor-pointer border ${paymentMethod === 'COD' ? 'border-zinc-900 bg-zinc-50' : 'border-zinc-200'} p-4 transition-all relative overflow-hidden`}>
                   <div className="flex items-center">
                     <input 
                       type="radio" 
                       name="payment" 
-                      value="cod" 
-                      checked={paymentMethod === 'cod'} 
-                      onChange={() => setPaymentMethod('cod')}
+                      value="COD" 
+                      checked={paymentMethod === 'COD'} 
+                      onChange={() => setPaymentMethod('COD')}
                       className="form-radio h-5 w-5 text-zinc-900 border-zinc-300 focus:ring-zinc-900"
                     />
                     <div className="ml-4 flex-1">
@@ -336,7 +336,7 @@ export default function CheckoutPage() {
                 disabled={isSubmitting || cartItems.length === 0}
                 className="w-full bg-zinc-900 text-white py-4 font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors flex justify-center items-center disabled:opacity-50"
               >
-                {isSubmitting ? 'Đang xử lý...' : paymentMethod === 'vnpay' ? 'Thanh toán qua VNPAY' : 'Hoàn tất đặt hàng'}
+                {isSubmitting ? 'Đang xử lý...' : paymentMethod === 'VNPAY' ? 'Thanh toán qua VNPAY' : 'Hoàn tất đặt hàng'}
               </button>
 
               <div className="mt-4 flex items-center justify-center text-zinc-400 text-xs gap-1">

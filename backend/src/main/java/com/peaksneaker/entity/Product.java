@@ -1,5 +1,7 @@
 package com.peaksneaker.entity;
 
+import com.peaksneaker.enums.Gender;
+import com.peaksneaker.enums.ProductType;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -26,10 +28,6 @@ public class Product {
     private String name;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "brand_id")
-    private Brand brand;
-
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "silhouette_id")
     private Silhouette silhouette;
 
@@ -43,12 +41,23 @@ public class Product {
     @Column(name = "base_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal basePrice;
 
+    @Column(name = "discount_percent", precision = 5, scale = 2)
+    @Builder.Default
+    private BigDecimal discountPercent = BigDecimal.ZERO;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "brand_id")
+    private Brand brand;
+
+    @Column(name = "price", nullable = false, precision = 12, scale = 2)
+    private BigDecimal price;
+
     @Column(length = 50)
-    private String gender; // MEN | WOMEN | UNISEX
+    private Gender gender; // MEN | WOMEN | UNISEX
 
     @Column(name = "product_type", nullable = false, length = 50)
     @Builder.Default
-    private String productType = "SNEAKER"; // SNEAKER | ACCESSORY
+    private ProductType productType = ProductType.SNEAKER; // SNEAKER | ACCESSORY
 
     @Column(name = "is_deleted", nullable = false)
     @Builder.Default

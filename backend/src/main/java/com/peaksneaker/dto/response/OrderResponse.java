@@ -1,5 +1,7 @@
 package com.peaksneaker.dto.response;
 
+import com.peaksneaker.enums.OrderStatus;
+import com.peaksneaker.enums.PaymentStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,8 +23,8 @@ public class OrderResponse {
     private BigDecimal discountAmount;
     private BigDecimal shippingFee;
     private BigDecimal finalAmount;
-    private String status;
-    private String paymentStatus;
+    private OrderStatus status;
+    private PaymentStatus paymentStatus;
     private String shippingName;
     private String shippingPhone;
     private String shippingProvince;

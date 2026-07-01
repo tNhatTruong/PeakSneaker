@@ -1,5 +1,6 @@
 package com.peaksneaker.entity;
 
+import com.peaksneaker.enums.DiscountType;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -22,7 +23,7 @@ public class Voucher {
     private String code;
 
     @Column(name = "discount_type", nullable = false, length = 20)
-    private String discountType; // PERCENTAGE | FIXED
+    private DiscountType discountType; // PERCENTAGE | FIXED
 
     @Column(name = "discount_value", nullable = false, precision = 12, scale = 2)
     private BigDecimal discountValue;
@@ -104,22 +105,27 @@ public class Voucher {
             return BigDecimal.ZERO;
         }
 
-        BigDecimal discount = BigDecimal.ZERO;
+        BigDecimal discount;
 
-        if ("PERCENTAGE".equalsIgnoreCase(this.discountType)) {
-            // tính số tiền giảm theo phần trăm
-            BigDecimal fraction = this.discountValue.divide(BigDecimal.valueOf(100));
-            discount = orderSubtotal.multiply(fraction);
-            // áp trần giảm giá tối đa nếu có
-            if (this.maxDiscountAmount != null && discount.compareTo(this.maxDiscountAmount) > 0) {
-                discount = this.maxDiscountAmount;
-            }
-        } else if ("FIXED".equalsIgnoreCase(this.discountType)) {
-            // giảm một số tiền cố định
-            discount = this.discountValue;
+        switch (this.discountType) {
+            case PERCENTAGE:
+                // Tính số tiền giảm theo phần trăm
+                BigDecimal fraction = this.discountValue.divide(BigDecimal.valueOf(100));
+                discount = orderSubtotal.multiply(fraction);
+                // Áp trần giảm giá tối đa nếu có
+                if (this.maxDiscountAmount != null
+                        && discount.compareTo(this.maxDiscountAmount) > 0) {
+                    discount = this.maxDiscountAmount;
+                }
+                break;
+            case FIXED:
+                // Giảm một số tiền cố định
+                discount = this.discountValue;
+                break;
+            default:
+                throw new IllegalStateException("Loại giảm giá không hợp lệ: " + this.discountType);
         }
-
-        // đảm bảo giảm giá không vượt quá tổng đơn hàng
+        // Đảm bảo giảm giá không vượt quá tổng đơn hàng
         if (discount.compareTo(orderSubtotal) > 0) {
             discount = orderSubtotal;
         }
