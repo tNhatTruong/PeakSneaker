@@ -38,6 +38,9 @@ public class Product {
     @Column(columnDefinition = "text")
     private String description;
 
+    @Column(name = "attribute", columnDefinition = "jsonb")
+    private String attributes; // Stored as JSON string
+
     @Column(name = "base_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal basePrice;
 
@@ -45,18 +48,16 @@ public class Product {
     @Builder.Default
     private BigDecimal discountPercent = BigDecimal.ZERO;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "brand_id")
-    private Brand brand;
-
     @Column(name = "price", nullable = false, precision = 12, scale = 2)
     private BigDecimal price;
 
-    @Column(length = 50)
+    @Enumerated(EnumType.STRING)
+    @Column(columnDefinition = "varchar(50)")
     private Gender gender; // MEN | WOMEN | UNISEX
 
-    @Column(name = "product_type", nullable = false, length = 50)
+    @Column(name = "product_type", nullable = false, columnDefinition = "varchar(50)")
     @Builder.Default
+    @Enumerated(EnumType.STRING)
     private ProductType productType = ProductType.SNEAKER; // SNEAKER | ACCESSORY
 
     @Column(name = "is_deleted", nullable = false)

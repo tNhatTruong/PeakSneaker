@@ -22,7 +22,8 @@ public class Voucher {
     @Column(nullable = false, unique = true, length = 50)
     private String code;
 
-    @Column(name = "discount_type", nullable = false, length = 20)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "discount_type", nullable = false, columnDefinition = "varchar(50)")
     private DiscountType discountType; // PERCENTAGE | FIXED
 
     @Column(name = "discount_value", nullable = false, precision = 12, scale = 2)

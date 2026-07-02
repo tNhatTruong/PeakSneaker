@@ -32,8 +32,5 @@ public class Brand {
     private Boolean isDeleted = false;
 
     @OneToMany(mappedBy = "brand", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Product> products;
-
-    @OneToMany(mappedBy = "brand", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Silhouette> silhouettes;
 }
