@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import com.peaksneaker.enums.OrderStatus;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -27,6 +28,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Page<Order> searchOrders(@Param("query") String query, Pageable pageable);
 
     List<Order> findByCreatedAtBetween(Instant start, Instant end);
+
+    long countByCreatedAtBetween(Instant start, Instant end);
+
+    long countByStatusAndCreatedAtBetween(OrderStatus status, Instant start, Instant end);
 
     @Query("SELECT SUM(o.finalAmount) FROM Order o WHERE o.status = 'COMPLETED'")
     BigDecimal calculateTotalRevenue();
