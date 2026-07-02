@@ -14,6 +14,10 @@ export interface ProductResponse {
   defaultImageUrl: string;
   isFeatured: boolean;
   isNew: boolean;
+  discountPercent?: number;
+  price?: number;
+  isDeleted?: boolean;
+  totalStock?: number;
 }
 
 export interface ImageResponse {
@@ -46,11 +50,16 @@ export interface ProductDetailResponse {
   name: string;
   description: string;
   basePrice: number;
+  discountPercent?: number;
+  price?: number;
   brand: BrandResponse | null;
   category: CategoryResponse | null;
   silhouette: SilhouetteResponse | null;
+  gender?: string;
+  productType?: string;
   isFeatured: boolean;
   isNew: boolean;
+  isDeleted?: boolean;
   images: ImageResponse[];
   variants: ProductVariantResponse[];
 }
