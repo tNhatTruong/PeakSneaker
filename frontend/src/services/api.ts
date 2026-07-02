@@ -37,10 +37,13 @@ apiClient.interceptors.response.use(
     return response.data; // Bóc tách thẳng vào object `ApiResponse`
   },
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // Xóa token nếu bị lỗi xác thực 401 Unauthorized
+    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+      // Xóa token nếu bị lỗi xác thực 401 Unauthorized hoặc 403 Forbidden
       localStorage.removeItem('token');
-      // Tùy chọn: Chuyển hướng sang trang đăng nhập (có thể dùng window.location)
+      // Chuyển hướng sang trang đăng nhập nếu chưa ở trang đăng nhập
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
