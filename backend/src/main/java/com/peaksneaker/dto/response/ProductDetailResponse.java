@@ -17,11 +17,16 @@ public class ProductDetailResponse {
     private String name;
     private String description;
     private BigDecimal basePrice;
+    private BigDecimal discountPercent;
+    private BigDecimal price;
     private BrandResponse brand;
     private CategoryResponse category;
     private SilhouetteResponse silhouette;
+    private String gender;
+    private String productType;
     private Boolean isFeatured;
     private Boolean isNew;
+    private Boolean isDeleted;
     private List<ImageResponse> images;
     private List<ProductVariantResponse> variants;
 }
