@@ -1,15 +1,19 @@
 version: '3.9'
+
 services:
   db:
-    image: postgres:16
+    image: mysql:8.4
     container_name: peaksneaker_db
+
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: 123456
-      POSTGRES_DB: peaksneaker
+      MYSQL_ROOT_PASSWORD: 1
+      MYSQL_DATABASE: peaksneaker
+
     ports:
-      - "5433:5432"
+      - "3306:3306"
+
     volumes:
-      - peaksneaker_postgres_data:/var/lib/postgresql/data
+      - peaksneaker_mysql_data:/var/lib/mysql
+
 volumes:
-  peaksneaker_postgres_data:
+  peaksneaker_mysql_data:

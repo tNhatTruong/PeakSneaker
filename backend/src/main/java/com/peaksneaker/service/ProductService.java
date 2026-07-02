@@ -1,6 +1,7 @@
 package com.peaksneaker.service;
 
 import com.peaksneaker.dto.response.*;
+import com.peaksneaker.entity.Brand;
 import com.peaksneaker.entity.Image;
 import com.peaksneaker.entity.Product;
 import com.peaksneaker.repository.ProductRepository;
@@ -83,15 +84,17 @@ public class ProductService {
                 .orElse(product.getImages().isEmpty() ? null : product.getImages().get(0).getImageName());
 
         BrandResponse brandResponse = null;
-        if (product.getBrand() != null) {
+        if (product.getSilhouette() != null && product.getSilhouette().getBrand() != null) {
+            Brand brand = product.getSilhouette().getBrand();
+
             brandResponse = BrandResponse.builder()
-                    .id(product.getBrand().getId())
-                    .name(product.getBrand().getName())
-                    .logoUrl(product.getBrand().getLogoUrl())
+                    .id(brand.getId())
+                    .name(brand.getName())
+                    .logoUrl(brand.getLogoUrl())
+                    .description(brand.getDescription())
                     .build();
         }
 
-        // Đánh dấu là sản phẩm mới nếu được tạo trong vòng 7 ngày qua
         boolean isNew = product.getCreatedAt().isAfter(Instant.now().minus(7, ChronoUnit.DAYS));
 
         return ProductResponse.builder()
@@ -106,12 +109,16 @@ public class ProductService {
     }
 
     private ProductDetailResponse mapToDetailResponse(Product product) {
+
         BrandResponse brandResponse = null;
-        if (product.getBrand() != null) {
+        if (product.getSilhouette() != null && product.getSilhouette().getBrand() != null) {
+            Brand brand = product.getSilhouette().getBrand();
+
             brandResponse = BrandResponse.builder()
-                    .id(product.getBrand().getId())
-                    .name(product.getBrand().getName())
-                    .logoUrl(product.getBrand().getLogoUrl())
+                    .id(brand.getId())
+                    .name(brand.getName())
+                    .logoUrl(brand.getLogoUrl())
+                    .description(brand.getDescription())
                     .build();
         }
 

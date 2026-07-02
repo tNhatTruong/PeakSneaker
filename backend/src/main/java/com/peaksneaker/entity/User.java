@@ -33,7 +33,8 @@ public class User {
     @Column(unique = true, length = 20)
     private String phone;
 
-    @Column(nullable = false, length = 50)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, columnDefinition = "varchar(50)")
     @Builder.Default
     private Role role = Role.USER; //USER ,ADMIN
 
