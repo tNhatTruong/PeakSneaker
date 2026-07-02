@@ -85,9 +85,9 @@ public class DashboardService {
         List<Object[]> rawTopProducts = orderItemRepository.findTopSellingProducts(PageRequest.of(0, 5));
         List<TopProductResponse> topProducts = new ArrayList<>();
         for (Object[] row : rawTopProducts) {
-            Long productId = (Long) row[0];
+            Long productId = row[0] != null ? ((Number) row[0]).longValue() : null;
             String productName = (String) row[1];
-            Long quantitySold = (Long) row[2];
+            Long quantitySold = row[2] != null ? ((Number) row[2]).longValue() : 0L;
             BigDecimal maxUnitPrice = (BigDecimal) row[3];
 
             Optional<Product> optProduct = productRepository.findById(productId);
