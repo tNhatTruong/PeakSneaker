@@ -27,13 +27,15 @@ public class Payment {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
-    @Column(name = "payment_method", nullable = false, length = 100)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", nullable = false, columnDefinition = "varchar(50)")
     private PaymentMethod paymentMethod; // COD | VNPAY
 
     @Column(name = "transaction_id")
     private String transactionId;
 
-    @Column(nullable = false, length = 50)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false,columnDefinition = "varchar(50)")
     @Builder.Default
     private PaymentStatus status = PaymentStatus.PENDING; // PENDING | SUCCESS | FAILED | REFUNDED
 

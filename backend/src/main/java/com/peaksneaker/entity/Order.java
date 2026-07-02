@@ -47,11 +47,13 @@ public class Order {
     @Column(name = "final_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal finalAmount;
 
-    @Column(nullable = false, length = 50)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false,columnDefinition = "varchar(50)")
     @Builder.Default
     private OrderStatus status = OrderStatus.PENDING; // PENDING | SHIPPING | COMPLETED | CANCELLED
 
-    @Column(name = "payment_status", nullable = false, length = 50)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", columnDefinition = "varchar(50)",nullable = false)
     @Builder.Default
     private PaymentStatus paymentStatus = PaymentStatus.PENDING; // PENDING | PAID | FAILED | REFUNDED
 

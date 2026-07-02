@@ -30,7 +30,10 @@ public class ProductSpecification {
             }
 
             if (brandId != null) {
-                predicates.add(criteriaBuilder.equal(root.get("brand").get("id"), brandId));
+                predicates.add(criteriaBuilder.equal(
+                        root.get("silhouette").get("brand").get("id"),
+                        brandId
+                ));
             }
 
             if (silhouetteId != null) {
