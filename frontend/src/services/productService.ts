@@ -28,6 +28,7 @@ export interface ImageResponse {
 
 export interface ProductVariantResponse {
   id: number;
+  sku: string;
   color: string;
   size: string;
   stock: number;

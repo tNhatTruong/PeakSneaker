@@ -11,7 +11,7 @@
  Target Server Version : 80410 (8.4.10)
  File Encoding         : 65001
 
- Date: 02/07/2026 19:09:36
+ Date: 03/07/2026 18:27:36
 */
 
 SET NAMES utf8mb4;
@@ -37,11 +37,20 @@ CREATE TABLE `addresses`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `FK_addr_user`(`user_id` ASC) USING BTREE,
   CONSTRAINT `FK_addr_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 10 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of addresses
 -- ----------------------------
+INSERT INTO `addresses` VALUES (1, b'0', 1, '086501452', '1778', '258', '471006', 'Thị xã La Gi', 'Bình Thuận', 'Xã Tân Bình', 'Nguyễn Thiết Hinh', 'Ấp 6');
+INSERT INTO `addresses` VALUES (2, b'0', 1, '086501452', '1778', '258', '471006', 'Thị xã La Gi', 'Bình Thuận', 'Xã Tân Bình', 'Nguyễn Thiết Hinh', 'Ấp 6');
+INSERT INTO `addresses` VALUES (3, b'0', 1, '086501452', '1778', '258', '471006', 'Thị xã La Gi', 'Bình Thuận', 'Xã Tân Bình', 'Nguyễn Thiết Hinh', 'Ấp 6');
+INSERT INTO `addresses` VALUES (4, b'0', 1, '086501452', '1778', '258', '471006', 'Thị xã La Gi', 'Bình Thuận', 'Xã Tân Bình', 'Nguyễn Thiết Hinh', 'Ấp 6');
+INSERT INTO `addresses` VALUES (5, b'0', 1, '086501452', '1778', '258', '471006', 'Thị xã La Gi', 'Bình Thuận', 'Xã Tân Bình', 'Nguyễn Thiết Hinh', 'Ấp 6');
+INSERT INTO `addresses` VALUES (6, b'0', 1, '086501452', '1778', '258', '471006', 'Thị xã La Gi', 'Bình Thuận', 'Xã Tân Bình', 'Nguyễn Thiết Hinh', 'Ấp 6');
+INSERT INTO `addresses` VALUES (7, b'0', 1, '0866501452', '1779', '258', '470704', 'Huyện Đức Linh', 'Bình Thuận', 'Xã Đông Hà', 'Hinh', 'ap 5');
+INSERT INTO `addresses` VALUES (8, b'0', 1, '0866501455', '2206', '260', '390604', 'Huyện Sông Hinh', 'Phú Yên', 'Xã Ea Bá', 'Hinh', 'ap 5');
+INSERT INTO `addresses` VALUES (9, b'1', 1, '0866501455', '2211', '260', '390507', 'Huyện Sơn Hòa', 'Phú Yên', 'Xã Sơn Hà', 'Hinh', 'ap 5');
 
 -- ----------------------------
 -- Table structure for brands
@@ -79,7 +88,7 @@ CREATE TABLE `cart_items`  (
   INDEX `FKn1s4l7h0vm4o259wpu7ft0y2y`(`product_variant_id` ASC) USING BTREE,
   CONSTRAINT `FK_cart_item_cart` FOREIGN KEY (`cart_id`) REFERENCES `carts` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `FKn1s4l7h0vm4o259wpu7ft0y2y` FOREIGN KEY (`product_variant_id`) REFERENCES `product_variants` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of cart_items
@@ -120,8 +129,7 @@ CREATE TABLE `categories`  (
 -- ----------------------------
 -- Records of categories
 -- ----------------------------
-INSERT INTO `categories` VALUES (1, 'Giày Nam', 'giay-nam', 'Bộ sưu tập giày thể thao dành cho nam', NULL);
-INSERT INTO `categories` VALUES (2, 'Giày Nữ', 'giay-nu', 'Bộ sưu tập giày thể thao dành cho nữ', NULL);
+INSERT INTO `categories` VALUES (1, 'Giày Sneker', 'giay-sneaker', 'Bộ sưu tập giày thể thao dành cho nam', NULL);
 INSERT INTO `categories` VALUES (3, 'Phụ Kiện', 'phu-kien', 'Tất, dây giày, bình nước, balo...', NULL);
 
 -- ----------------------------
@@ -139,7 +147,7 @@ CREATE TABLE `images`  (
   INDEX `FKq4m09wgn47ymx4wgldqt24mes`(`product_variant_id` ASC) USING BTREE,
   CONSTRAINT `FKghwsjbjo7mg3iufxruvq6iu3q` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `FKq4m09wgn47ymx4wgldqt24mes` FOREIGN KEY (`product_variant_id`) REFERENCES `product_variants` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 31 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 32 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of images
@@ -174,6 +182,29 @@ INSERT INTO `images` VALUES (27, 'suede_red_white.jpg', b'0', 9, 27);
 INSERT INTO `images` VALUES (28, 'rsx_multicolor.jpg', b'1', 10, 28);
 INSERT INTO `images` VALUES (29, 'rsx_multicolor.jpg', b'0', 10, 29);
 INSERT INTO `images` VALUES (30, 'rsx_black_red.jpg', b'0', 10, 30);
+INSERT INTO `images` VALUES (31, 'icon_splash.jpg', b'1', 11, NULL);
+
+-- ----------------------------
+-- Table structure for inventory_transactions
+-- ----------------------------
+DROP TABLE IF EXISTS `inventory_transactions`;
+CREATE TABLE `inventory_transactions`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `created_at` datetime(6) NOT NULL,
+  `note` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
+  `quantity` int NOT NULL,
+  `type` enum('EXPORT','IMPORT') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `variant_id` bigint NOT NULL,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `FKw2ymau4bkb32bmypse7kgw70`(`variant_id` ASC) USING BTREE,
+  CONSTRAINT `FKw2ymau4bkb32bmypse7kgw70` FOREIGN KEY (`variant_id`) REFERENCES `product_variants` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Records of inventory_transactions
+-- ----------------------------
+INSERT INTO `inventory_transactions` VALUES (1, '2026-07-03 10:33:48.544482', 'thêm đơn hàng tháng 7', 4, 'IMPORT', 4);
+INSERT INTO `inventory_transactions` VALUES (2, '2026-07-03 11:02:08.366658', 'thêm đơn hàng tháng 7', 1, 'IMPORT', 34);
 
 -- ----------------------------
 -- Table structure for order_items
@@ -194,11 +225,13 @@ CREATE TABLE `order_items`  (
   INDEX `FKltmtlue0wixrg1cf0xo7x0l4d`(`product_variant_id` ASC) USING BTREE,
   CONSTRAINT `FK_oi_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `FKltmtlue0wixrg1cf0xo7x0l4d` FOREIGN KEY (`product_variant_id`) REFERENCES `product_variants` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of order_items
 -- ----------------------------
+INSERT INTO `order_items` VALUES (1, 1, 11, 'Adidas Ultraboost Light', 'Core Black 38', 'P4-CB-38', 1, 5000000.00, 5000000.00);
+INSERT INTO `order_items` VALUES (2, 2, 4, 'Nike Air Zoom Pegasus 40', 'Black/White 42', 'P2-BW-42', 1, 3500000.00, 3500000.00);
 
 -- ----------------------------
 -- Table structure for orders
@@ -228,11 +261,13 @@ CREATE TABLE `orders`  (
   INDEX `FKdimvsocblb17f45ikjr6xn1wj`(`voucher_id` ASC) USING BTREE,
   CONSTRAINT `FK32ql8ubntj5uh44ph9659tiih` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `FKdimvsocblb17f45ikjr6xn1wj` FOREIGN KEY (`voucher_id`) REFERENCES `vouchers` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of orders
 -- ----------------------------
+INSERT INTO `orders` VALUES (1, 1, NULL, 5000000.00, 0.00, 30000.00, 5030000.00, 'Hinh', '0866501455', 'Phú Yên', 'Huyện Sông Hinh', 'Xã Ea Bá', 'ap 5', 'can than', 'PENDING', 'PENDING', '2026-07-02 13:13:21.769011', '2026-07-02 13:13:21.775879');
+INSERT INTO `orders` VALUES (2, 1, NULL, 3500000.00, 0.00, 30000.00, 3530000.00, 'Hinh', '0866501455', 'Phú Yên', 'Huyện Sơn Hòa', 'Xã Sơn Hà', 'ap 5', 'can than', 'SHIPPING', 'PENDING', '2026-07-02 13:13:59.598953', '2026-07-02 17:32:58.263628');
 
 -- ----------------------------
 -- Table structure for payments
@@ -250,7 +285,7 @@ CREATE TABLE `payments`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `FK81gagumt0r8y3rmudcgpbk42l`(`order_id` ASC) USING BTREE,
   CONSTRAINT `FK81gagumt0r8y3rmudcgpbk42l` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of payments
@@ -274,41 +309,42 @@ CREATE TABLE `product_variants`  (
   UNIQUE INDEX `UK_variant_sku`(`sku` ASC) USING BTREE,
   INDEX `FK_variant_product`(`product_id` ASC) USING BTREE,
   CONSTRAINT `FK_variant_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 31 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 35 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of product_variants
 -- ----------------------------
-INSERT INTO `product_variants` VALUES (1, 1, 'P1-WH-40', 'White', '40', 48, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (2, 1, 'P1-WH-41', 'White', '41', 45, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (3, 1, 'P1-BK-40', 'Black', '40', 20, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (4, 2, 'P2-BW-42', 'Black/White', '42', 22, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (5, 2, 'P2-BW-43', 'Black/White', '43', 25, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (6, 2, 'P2-BL-42', 'Blue', '42', 15, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (7, 3, 'P3-WG-39', 'White/Green', '39', 40, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (8, 3, 'P3-WG-40', 'White/Green', '40', 63, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (9, 3, 'P3-WN-39', 'White/Navy', '39', 20, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (10, 4, 'P4-CB-37', 'Core Black', '37', 15, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (11, 4, 'P4-CB-38', 'Core Black', '38', 20, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (12, 4, 'P4-CW-38', 'Cloud White', '38', 10, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (13, 5, 'P5-BW-40', 'Black/White', '40', 100, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (14, 5, 'P5-BW-41', 'Black/White', '41', 120, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (15, 5, 'P5-NV-40', 'Navy', '40', 40, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (16, 6, 'P6-BWC-39', 'Black/White Check', '39', 55, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (17, 6, 'P6-BWC-40', 'Black/White Check', '40', 65, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (18, 6, 'P6-RC-39', 'Red Check', '39', 15, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (19, 7, 'P7-BK-41', 'Black', '41', 80, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (20, 7, 'P7-BK-42', 'Black', '42', 75, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (21, 7, 'P7-OW-41', 'Optical White', '41', 50, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (22, 8, 'P8-BK-36', 'Black', '36', 30, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (23, 8, 'P8-BK-37', 'Black', '37', 45, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (24, 8, 'P8-WH-37', 'White', '37', 25, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (25, 9, 'P9-BW-42', 'Black/White', '42', 20, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (26, 9, 'P9-BW-43', 'Black/White', '43', 15, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (27, 9, 'P9-RW-42', 'Red/White', '42', 10, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (28, 10, 'P10-MC-40', 'Multicolor', '40', 35, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (29, 10, 'P10-MC-41', 'Multicolor', '41', 40, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (30, 10, 'P10-BR-41', 'Black/Red', '41', 20, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (1, 1, 'P1-WH-40', 'Trắng', '40', 48, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (2, 1, 'P1-WH-41', 'Trắng', '41', 45, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (3, 1, 'P1-BK-40', 'Đen', '40', 20, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (4, 2, 'P2-BW-42', 'Đen/Trắng', '42', 25, 0.00, '2026-06-25 02:33:58.000000', '2026-07-03 10:33:48.600262');
+INSERT INTO `product_variants` VALUES (5, 2, 'P2-BW-43', 'Đen/Trắng', '43', 25, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (6, 2, 'P2-BL-42', 'Xanh dương', '42', 15, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (7, 3, 'P3-WG-39', 'Trắng/Xanh lá', '39', 40, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (8, 3, 'P3-WG-40', 'Trắng/Xanh lá', '40', 63, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (9, 3, 'P3-WN-39', 'Trắng/Xanh navy', '39', 20, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (10, 4, 'P4-CB-37', 'Đen tuyền', '37', 15, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (11, 4, 'P4-CB-38', 'Đen tuyền', '38', 20, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (12, 4, 'P4-CW-38', 'Trắng mây', '38', 10, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (13, 5, 'P5-BW-40', 'Đen/Trắng', '40', 100, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (14, 5, 'P5-BW-41', 'Đen/Trắng', '41', 120, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (15, 5, 'P5-NV-40', 'Xanh navy', '40', 40, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (16, 6, 'P6-BWC-39', 'Caro Đen/Trắng', '39', 55, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (17, 6, 'P6-BWC-40', 'Caro Đen/Trắng', '40', 65, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (18, 6, 'P6-RC-39', 'Caro Đỏ', '39', 15, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (19, 7, 'P7-BK-41', 'Đen', '41', 80, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (20, 7, 'P7-BK-42', 'Đen', '42', 75, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (21, 7, 'P7-OW-41', 'Trắng', '41', 50, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (22, 8, 'P8-BK-36', 'Đen', '36', 30, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (23, 8, 'P8-BK-37', 'Đen', '37', 45, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (24, 8, 'P8-WH-37', 'Trắng', '37', 25, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (25, 9, 'P9-BW-42', 'Đen/Trắng', '42', 20, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (26, 9, 'P9-BW-43', 'Đen/Trắng', '43', 15, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (27, 9, 'P9-RW-42', 'Đỏ/Trắng', '42', 10, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (28, 10, 'P10-MC-40', 'Đa màu', '40', 35, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (29, 10, 'P10-MC-41', 'Đa màu', '41', 40, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (30, 10, 'P10-BR-41', 'Đen/Đỏ', '41', 20, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
+INSERT INTO `product_variants` VALUES (34, 11, 'NIKE-AIR-0001', 'Đen', '42', 1, 0.00, '2026-07-03 11:01:38.272714', '2026-07-03 11:02:08.379845');
 
 -- ----------------------------
 -- Table structure for products
@@ -334,21 +370,22 @@ CREATE TABLE `products`  (
   INDEX `FK_p_sil`(`silhouette_id` ASC) USING BTREE,
   CONSTRAINT `FK_p_cat` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `FK_p_sil` FOREIGN KEY (`silhouette_id`) REFERENCES `silhouettes` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 11 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 12 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of products
 -- ----------------------------
-INSERT INTO `products` VALUES (1, 'Nike Air Force 1 07', 'Giày sneaker cổ điển form dáng huyền thoại', '{\"phong_cách\": \"Phong cách thường ngày năng động, phù hợp nhiều hoàn cảnh sử dụng\", \"chất_liệu\": \"Da tổng hợp cao cấp mềm mại, bền đẹp và dễ vệ sinh\"}', 'UNISEX', 'SNEAKER', 2900000.00, 0.00, 2900000.00, 1, 1, b'0', b'0', '2026-06-25 02:30:36.000000');
+INSERT INTO `products` VALUES (1, 'Nike Air Force 1 07', 'Giày sneaker cổ điển form dáng huyền thoại', '{\"phong_cách\": \"Phong cách thường ngày năng động, phù hợp nhiều hoàn cảnh sử dụng\", \"chất_liệu\": \"Da tổng hợp cao cấp mềm mại, bền đẹp và dễ vệ sinh\"}', 'UNISEX', 'SNEAKER', 2800000.00, 12.00, 2464000.00, 1, 1, b'0', b'0', '2026-06-25 02:30:36.000000');
 INSERT INTO `products` VALUES (2, 'Nike Air Zoom Pegasus 40', 'Giày chạy bộ êm ái, thoáng khí.', '{\"phong_cách\": \"Phong cách thể thao chạy bộ, tối ưu cho vận động và tập luyện\", \"chất_liệu\": \"Vải lưới thoáng khí nhẹ nhàng, hỗ trợ lưu thông không khí tốt\"}', 'MEN', 'SNEAKER', 3500000.00, 0.10, 3150000.00, 1, 2, b'0', b'0', '2026-06-25 02:30:36.000000');
 INSERT INTO `products` VALUES (3, 'Adidas Stan Smith', 'Giày tennis phong cách tối giản.', '{\"phong_cách\": \"Phong cách thường ngày hiện đại, dễ phối với many loại trang phục\", \"chất_liệu\": \"Da thuần chay thân thiện với môi trường, mềm mại và bền bỉ\"}', 'UNISEX', 'SNEAKER', 2600000.00, 0.00, 2600000.00, 1, 3, b'0', b'0', '2026-06-25 02:30:36.000000');
-INSERT INTO `products` VALUES (4, 'Adidas Ultraboost Light', 'Giày chạy bộ công nghệ đệm Boost nhẹ nhất.', '{\"phong_cách\": \"Phong cách chạy bộ chuyên dụng, mang lại cảm giác nhẹ và thoải mái\", \"chất_liệu\": \"Vải dệt Primeknit co giãn linh hoạt, ôm chân và thoáng khí\"}', 'WOMEN', 'SNEAKER', 5000000.00, 0.20, 4000000.00, 2, 4, b'0', b'0', '2026-06-25 02:30:36.000000');
+INSERT INTO `products` VALUES (4, 'Adidas Ultraboost Light', 'Giày chạy bộ công nghệ đệm Boost nhẹ nhất.', '{\"phong_cách\": \"Phong cách chạy bộ chuyên dụng, mang lại cảm giác nhẹ và thoải mái\", \"chất_liệu\": \"Vải dệt Primeknit co giãn linh hoạt, ôm chân và thoáng khí\"}', 'WOMEN', 'SNEAKER', 5000000.00, 0.20, 4000000.00, 1, 4, b'0', b'0', '2026-06-25 02:30:36.000000');
 INSERT INTO `products` VALUES (5, 'Vans Old Skool', 'Giày trượt ván mũi lộn, sọc jazz kinh điển.', '{\"phong_cách\": \"Phong cách trượt ván cá tính, phù hợp với giới trẻ năng động\", \"chất_liệu\": \"Sự kết hợp giữa vải canvas và da lộn, tạo độ bền và tính thẩm mỹ cao\"}', 'UNISEX', 'SNEAKER', 1900000.00, 0.10, 1710000.00, 1, 5, b'0', b'0', '2026-06-25 02:30:36.000000');
 INSERT INTO `products` VALUES (6, 'Vans Slip-On Checkerboard', 'Giày lười họa tiết caro.', '{\"phong_cách\": \"Phong cách thường ngày trẻ trung, phù hợp cho các hoạt động hằng ngày\", \"chất_liệu\": \"Vải canvas chắc chắn, thoáng mát và dễ bảo quản\"}', 'UNISEX', 'SNEAKER', 1700000.00, 0.10, 1530000.00, 1, 6, b'0', b'0', '2026-06-25 02:30:36.000000');
 INSERT INTO `products` VALUES (7, 'Converse Chuck Taylor All Star', 'Giày cổ cao vải canvas truyền thống.', '{\"phong_cách\": \"Phong cách thường ngày đơn giản, dễ dàng phối hợp với many trang phục\", \"chất_liệu\": \"Vải canvas bền bỉ với khả năng chống mài mòn tốt\"}', 'UNISEX', 'SNEAKER', 1500000.00, 0.00, 1500000.00, 1, 7, b'0', b'0', '2026-06-25 02:30:36.000000');
-INSERT INTO `products` VALUES (8, 'Converse Run Star Hike', 'Giày đế độn phong cách cá tính.', '{\"phong_cách\": \"Phong cách đế dày thời trang, tạo điểm nhấn nổi bật và cá tính\", \"chất_liệu\": \"Vải canvas chất lượng cao, mang lại cảm giác thoải mái khi sử dụng\"}', 'WOMEN', 'SNEAKER', 2800000.00, 0.10, 2520000.00, 2, 8, b'0', b'0', '2026-06-25 02:30:36.000000');
+INSERT INTO `products` VALUES (8, 'Converse Run Star Hike', 'Giày đế độn phong cách cá tính.', '{\"phong_cách\": \"Phong cách đế dày thời trang, tạo điểm nhấn nổi bật và cá tính\", \"chất_liệu\": \"Vải canvas chất lượng cao, mang lại cảm giác thoải mái khi sử dụng\"}', 'WOMEN', 'SNEAKER', 2800000.00, 0.10, 2520000.00, 1, 8, b'0', b'0', '2026-06-25 02:30:36.000000');
 INSERT INTO `products` VALUES (9, 'Puma Suede Classic', 'Giày da lộn phong cách retro.', '{\"phong_cách\": \"Phong cách thường ngày thanh lịch, phù hợp cho nhiều dịp khác nhau\", \"chất_liệu\": \"Da lộn mềm mại với bề mặt sang trọng và tinh tế\"}', 'MEN', 'SNEAKER', 2200000.00, 0.00, 2200000.00, 1, 9, b'0', b'0', '2026-06-25 02:30:36.000000');
 INSERT INTO `products` VALUES (10, 'Puma RS-X Toys', 'Giày sneaker phom dáng chunky hầm hố.', '{\"phong_cách\": \"Phong cách đế dày hiện đại, mang lại vẻ ngoài nổi bật và thời thượng\", \"chất_liệu\": \"Kết hợp giữa vải lưới thoáng khí và da bền chắc, tăng độ ổn định khi mang\"}', 'UNISEX', 'SNEAKER', 3000000.00, 0.30, 2100000.00, 1, 10, b'1', b'0', '2026-06-25 02:30:36.000000');
+INSERT INTO `products` VALUES (11, 'Nike air hinh', 'Chất liệu thoáng mát', NULL, 'UNISEX', 'SNEAKER', 10000000.00, 10.00, 9000000.00, 1, 1, b'0', b'0', '2026-07-03 10:43:20.159137');
 
 -- ----------------------------
 -- Table structure for reviews
@@ -367,7 +404,7 @@ CREATE TABLE `reviews`  (
   INDEX `FKcgy7qjc1r99dp117y9en6lxye`(`user_id` ASC) USING BTREE,
   CONSTRAINT `FKcgy7qjc1r99dp117y9en6lxye` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `FKpl51cejpw4gy5swfar8br9ngi` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of reviews
@@ -420,7 +457,7 @@ CREATE TABLE `user_vouchers`  (
   CONSTRAINT `FK40ig7khk2v79rbqaj98mf1g2q` FOREIGN KEY (`voucher_id`) REFERENCES `vouchers` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `FK90ahc2var0yrghyxr9tapdokg` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `FKsinwa2gat7e7x970yuw56tefs` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of user_vouchers
@@ -448,7 +485,7 @@ CREATE TABLE `users`  (
 -- ----------------------------
 -- Records of users
 -- ----------------------------
-INSERT INTO `users` VALUES (1, 'thiethinh789@gmail.com', '0866501452', 'Hinh', 'Thiết', '$2a$10$t4jO/WZSlutujGnY0AMw2uxaQ4xeDTFpKwzJkvwQfy5kdkB.J294q', 'USER', b'1', b'0', '2026-07-01 20:44:45.320539');
+INSERT INTO `users` VALUES (1, 'thiethinh789@gmail.com', '0866501452', 'Hinh', 'Thiết', '$2a$10$t4jO/WZSlutujGnY0AMw2uxaQ4xeDTFpKwzJkvwQfy5kdkB.J294q', 'ADMIN', b'1', b'0', '2026-07-01 20:44:45.320539');
 
 -- ----------------------------
 -- Table structure for vouchers
