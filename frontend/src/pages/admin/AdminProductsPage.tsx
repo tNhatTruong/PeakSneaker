@@ -140,9 +140,9 @@ interface ProductModalProps {
 function ProductModal({ mode, initial, silhouettes, categories, onSuccess, onClose }: ProductModalProps) {
   const [form, setForm] = useState<FormState>(() => {
     if (mode === 'edit' && initial) {
-      const basePrice = initial.basePrice ?? 0;
-      const discountPercent = initial.discountPercent ?? 0;
-      const price = initial.price ?? (basePrice - (basePrice * discountPercent / 100));
+      const basePrice = Number(initial.basePrice) || 0;
+      const discountPercent = Number(initial.discountPercent) || 0;
+      const price = Number(initial.price) || (basePrice - (basePrice * discountPercent / 100));
       return {
         name: initial.name ?? '',
         description: initial.description ?? '',
@@ -230,17 +230,22 @@ function ProductModal({ mode, initial, silhouettes, categories, onSuccess, onClo
     setSubmitting(true);
     try {
       const cleanDiscountPercent = form.discountPercent ? Number(Number(form.discountPercent).toFixed(2)) : 0;
+      
+      const payload: CreateProductPayload = {
+        name: form.name,
+        description: form.description || undefined,
+        basePrice: form.basePrice,
+        discountPercent: cleanDiscountPercent,
+        silhouetteId: form.silhouetteId,
+        categoryId: form.categoryId || undefined,
+        gender: form.gender,
+        productType: form.productType,
+        isFeatured: form.isFeatured,
+      };
+
       if (mode === 'create') {
-        const payload: CreateProductPayload = {
-          ...form,
-          discountPercent: cleanDiscountPercent,
-        };
         await AdminProductService.createProduct(payload, images);
       } else {
-        const payload: UpdateProductPayload = {
-          ...form,
-          discountPercent: cleanDiscountPercent,
-        };
         await AdminProductService.updateProduct(initial!.id, payload, images);
       }
       previews.forEach(URL.revokeObjectURL);
