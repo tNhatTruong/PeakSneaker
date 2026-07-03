@@ -5,7 +5,7 @@ import com.peaksneaker.dto.request.CreateVariantRequest;
 import com.peaksneaker.dto.response.ApiResponse;
 import com.peaksneaker.dto.response.InventoryTransactionResponse;
 import com.peaksneaker.dto.response.PaginatedResponse;
-import com.peaksneaker.entity.ProductVariant;
+import com.peaksneaker.dto.response.ProductVariantResponse;
 import com.peaksneaker.enums.InventoryTransactionType;
 import com.peaksneaker.service.InventoryService;
 import jakarta.validation.Valid;
@@ -26,10 +26,10 @@ public class InventoryController {
     private final InventoryService inventoryService;
 
     @PostMapping("/products/{productId}/variants")
-    public ResponseEntity<ApiResponse<ProductVariant>> createVariant(
+    public ResponseEntity<ApiResponse<ProductVariantResponse>> createVariant(
             @PathVariable Long productId,
             @Valid @RequestBody CreateVariantRequest request) {
-        ProductVariant variant = inventoryService.createVariant(productId, request);
+        ProductVariantResponse variant = inventoryService.createVariant(productId, request);
         return ResponseEntity.ok(ApiResponse.success("Tạo biến thể mới thành công", variant));
     }
 

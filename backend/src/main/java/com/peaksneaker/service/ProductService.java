@@ -232,7 +232,7 @@ public class ProductService {
 
         List<ProductVariantResponse> variantResponses = product.getVariants().stream()
                 .map(v -> ProductVariantResponse.builder().id(v.getId())
-                        .color(v.getColor()).size(v.getSize()).stock(v.getStockQuantity())
+                        .sku(v.getSku()).color(v.getColor()).size(v.getSize()).stock(v.getStockQuantity())
                         .priceMultiplier(v.getPriceAdjustment()).finalPrice(v.getFinalPrice()).build())
                 .collect(Collectors.toList());
 

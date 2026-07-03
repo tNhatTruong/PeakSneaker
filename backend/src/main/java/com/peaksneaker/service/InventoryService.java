@@ -4,6 +4,7 @@ import com.peaksneaker.dto.request.CreateTransactionRequest;
 import com.peaksneaker.dto.request.CreateVariantRequest;
 import com.peaksneaker.dto.response.InventoryTransactionResponse;
 import com.peaksneaker.dto.response.PaginatedResponse;
+import com.peaksneaker.dto.response.ProductVariantResponse;
 import com.peaksneaker.entity.InventoryTransaction;
 import com.peaksneaker.entity.Product;
 import com.peaksneaker.entity.ProductVariant;
@@ -35,7 +36,7 @@ public class InventoryService {
     private final InventoryTransactionRepository inventoryTransactionRepository;
 
     @Transactional
-    public ProductVariant createVariant(Long productId, CreateVariantRequest request) {
+    public ProductVariantResponse createVariant(Long productId, CreateVariantRequest request) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy sản phẩm với ID: " + productId));
 
@@ -54,7 +55,17 @@ public class InventoryService {
                 .priceAdjustment(priceAdjustment)
                 .build();
 
-        return productVariantRepository.save(variant);
+        ProductVariant saved = productVariantRepository.save(variant);
+
+        return ProductVariantResponse.builder()
+                .id(saved.getId())
+                .sku(saved.getSku())
+                .color(saved.getColor())
+                .size(saved.getSize())
+                .stock(saved.getStockQuantity())
+                .priceMultiplier(saved.getPriceAdjustment())
+                .finalPrice(saved.getFinalPrice())
+                .build();
     }
 
     @Transactional
