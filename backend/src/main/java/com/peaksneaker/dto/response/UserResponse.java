@@ -13,7 +13,12 @@ import lombok.NoArgsConstructor;
 public class UserResponse {
     private Long id;
     private String email;
+    private String firstName;
+    private String lastName;
     private String fullName;
     private String phone;
     private Role role;
+    private Boolean isVerified;
+    private Boolean isActive;
+    private java.time.Instant createdAt;
 }
