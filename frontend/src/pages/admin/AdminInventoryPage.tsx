@@ -307,7 +307,7 @@ export default function AdminInventoryPage() {
                   ) : (
                     selectedProduct.variants.map((v) => (
                       <tr key={v.id} className="hover:bg-zinc-50 transition-colors">
-                        <td className="px-5 py-4 font-mono text-xs text-zinc-600">{v.color && v.size ? v.sku : 'Chưa định cấu hình'}</td>
+                        <td className="px-5 py-4 font-mono text-xs text-zinc-600">{v.sku || '—'}</td>
                         <td className="px-5 py-4 text-zinc-900 font-medium">{v.color ?? '—'}</td>
                         <td className="px-5 py-4 font-medium text-zinc-700">{v.size ?? '—'}</td>
                         <td className="px-5 py-4 text-right text-zinc-500 font-mono">
