@@ -3,11 +3,13 @@ package com.peaksneaker.entity;
 import com.peaksneaker.enums.DiscountType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLDelete;
 import java.math.BigDecimal;
 import java.time.Instant;
 
 @Entity
 @Table(name = "vouchers")
+@SQLDelete(sql = "UPDATE vouchers SET is_deleted = true WHERE id=?")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -55,6 +57,10 @@ public class Voucher {
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private Instant createdAt = Instant.now();
+
+    @Column(name = "is_deleted", nullable = false)
+    @Builder.Default
+    private Boolean isDeleted = false;
 
     // Kiểm tra xem mã giảm giá đã hết hạn hoặc chưa bắt đầu hiệu lực
     public boolean isExpired() {
