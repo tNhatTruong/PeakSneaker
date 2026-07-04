@@ -1,5 +1,7 @@
 package com.peaksneaker.entity;
 
+import com.peaksneaker.enums.PaymentMethod;
+import com.peaksneaker.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -25,15 +27,17 @@ public class Payment {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
-    @Column(name = "payment_method", nullable = false, length = 100)
-    private String paymentMethod; // COD | VNPAY
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", nullable = false, columnDefinition = "varchar(50)")
+    private PaymentMethod paymentMethod; // COD | VNPAY
 
     @Column(name = "transaction_id")
     private String transactionId;
 
-    @Column(nullable = false, length = 50)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false,columnDefinition = "varchar(50)")
     @Builder.Default
-    private String status = "PENDING"; // PENDING | SUCCESS | FAILED | REFUNDED
+    private PaymentStatus status = PaymentStatus.PENDING; // PENDING | SUCCESS | FAILED | REFUNDED
 
     @Column(name = "paid_at")
     private Instant paidAt;
@@ -43,30 +47,32 @@ public class Payment {
     private Instant createdAt = Instant.now();
 
 
-    // Xác nhận thanh toán thành công, ghi lại mã giao dịch và cập nhật trạng thái đơn hàng
+    // Xác nhận thanh toán thành công
     public void markSuccess(String transactionId) {
         this.transactionId = transactionId;
-        this.status = "SUCCESS";
+        this.status = PaymentStatus.PAID;
         this.paidAt = Instant.now();
-        
+
         if (this.order != null) {
-            this.order.updatePaymentStatus("PAID");
+            this.order.updatePaymentStatus(PaymentStatus.PAID);
         }
     }
 
-    // Đánh dấu giao dịch thất bại và cập nhật trạng thái thanh toán của đơn hàng
+    // Đánh dấu giao dịch thất bại
     public void markFailed() {
-        this.status = "FAILED";
+        this.status = PaymentStatus.FAILED;
+
         if (this.order != null) {
-            this.order.updatePaymentStatus("FAILED");
+            this.order.updatePaymentStatus(PaymentStatus.FAILED);
         }
     }
 
-    // Thực hiện hoàn tiền và cập nhật trạng thái thanh toán của đơn hàng
+    // Thực hiện hoàn tiền
     public void markRefunded() {
-        this.status = "REFUNDED";
+        this.status = PaymentStatus.REFUNDED;
+
         if (this.order != null) {
-            this.order.updatePaymentStatus("REFUNDED");
+            this.order.updatePaymentStatus(PaymentStatus.REFUNDED);
         }
     }
 }

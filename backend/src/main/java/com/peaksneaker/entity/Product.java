@@ -1,5 +1,7 @@
 package com.peaksneaker.entity;
 
+import com.peaksneaker.enums.Gender;
+import com.peaksneaker.enums.ProductType;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -26,10 +28,6 @@ public class Product {
     private String name;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "brand_id")
-    private Brand brand;
-
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "silhouette_id")
     private Silhouette silhouette;
 
@@ -40,15 +38,27 @@ public class Product {
     @Column(columnDefinition = "text")
     private String description;
 
+    @Column(name = "attribute", columnDefinition = "jsonb")
+    private String attributes; // Stored as JSON string
+
     @Column(name = "base_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal basePrice;
 
-    @Column(length = 50)
-    private String gender; // MEN | WOMEN | UNISEX
-
-    @Column(name = "product_type", nullable = false, length = 50)
+    @Column(name = "discount_percent", precision = 5, scale = 2)
     @Builder.Default
-    private String productType = "SNEAKER"; // SNEAKER | ACCESSORY
+    private BigDecimal discountPercent = BigDecimal.ZERO;
+
+    @Column(name = "price", nullable = false, precision = 12, scale = 2)
+    private BigDecimal price;
+
+    @Enumerated(EnumType.STRING)
+    @Column(columnDefinition = "varchar(50)")
+    private Gender gender; // MEN | WOMEN | UNISEX
+
+    @Column(name = "product_type", nullable = false, columnDefinition = "varchar(50)")
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    private ProductType productType = ProductType.SNEAKER; // SNEAKER | ACCESSORY
 
     @Column(name = "is_deleted", nullable = false)
     @Builder.Default

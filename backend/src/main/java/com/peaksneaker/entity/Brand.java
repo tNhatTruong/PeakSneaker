@@ -27,12 +27,9 @@ public class Brand {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "is_deleted", nullable = false)
+    @Column(name = "is_deleted")
     @Builder.Default
     private Boolean isDeleted = false;
-
-    @OneToMany(mappedBy = "brand", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Product> products;
 
     @OneToMany(mappedBy = "brand", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Silhouette> silhouettes;

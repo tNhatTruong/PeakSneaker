@@ -40,8 +40,6 @@ public class ProductVariant {
     @Builder.Default
     private BigDecimal priceAdjustment = BigDecimal.ZERO;
 
-    @Column(columnDefinition = "jsonb")
-    private String attributes; // Stored as JSON string
 
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default

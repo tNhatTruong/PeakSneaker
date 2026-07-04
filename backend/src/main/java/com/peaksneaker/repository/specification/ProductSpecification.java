@@ -30,7 +30,10 @@ public class ProductSpecification {
             }
 
             if (brandId != null) {
-                predicates.add(criteriaBuilder.equal(root.get("brand").get("id"), brandId));
+                predicates.add(criteriaBuilder.equal(
+                        root.get("silhouette").get("brand").get("id"),
+                        brandId
+                ));
             }
 
             if (silhouetteId != null) {
@@ -48,13 +51,27 @@ public class ProductSpecification {
             if (StringUtils.hasText(search)) {
                 String searchPattern = "%" + search.toLowerCase() + "%";
                 Predicate nameLike = criteriaBuilder.like(criteriaBuilder.lower(root.get("name")), searchPattern);
-                // Có thể mở rộng tìm kiếm theo description nếu cần
-                // Predicate descLike = criteriaBuilder.like(criteriaBuilder.lower(root.get("description")), searchPattern);
-                // predicates.add(criteriaBuilder.or(nameLike, descLike));
                 predicates.add(nameLike);
             }
 
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
         };
     }
+
+    /**
+     * Admin spec: khong loc isDeleted, bao gom ca san pham da xoa mem.
+     */
+    public static Specification<Product> filterProductsAdmin(String search) {
+        return (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (StringUtils.hasText(search)) {
+                String pattern = "%" + search.toLowerCase() + "%";
+                predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("name")), pattern));
+            }
+
+            return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+        };
+    }
 }
+

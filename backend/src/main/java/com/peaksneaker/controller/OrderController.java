@@ -3,6 +3,7 @@ package com.peaksneaker.controller;
 import com.peaksneaker.dto.request.CheckoutRequest;
 import com.peaksneaker.dto.response.ApiResponse;
 import com.peaksneaker.entity.Order;
+import com.peaksneaker.enums.PaymentMethod;
 import com.peaksneaker.security.UserDetailsImpl;
 import com.peaksneaker.service.OrderService;
 import com.peaksneaker.service.PaymentService;
@@ -31,8 +32,8 @@ public class OrderController {
         Order order = orderService.checkout(userDetails.getId(), request);
         String paymentUrl = null;
 
-        if ("vnpay".equalsIgnoreCase(request.getPaymentMethod())) {
-            // Get IP Address from request
+        if (request.getPaymentMethod() == PaymentMethod.VNPAY) {
+            // Lấy địa chỉ IP của client
             String ipAddress = httpRequest.getHeader("X-FORWARDED-FOR");
             if (ipAddress == null) {
                 ipAddress = httpRequest.getRemoteAddr();
@@ -45,7 +46,9 @@ public class OrderController {
                 .paymentUrl(paymentUrl)
                 .build();
 
-        return ResponseEntity.ok(ApiResponse.success("Tạo đơn hàng thành công!", response));
+        return ResponseEntity.ok(
+                ApiResponse.success("Tạo đơn hàng thành công!", response)
+        );
     }
 
     @GetMapping
