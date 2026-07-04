@@ -1,5 +1,6 @@
 package com.peaksneaker.entity;
 
+import com.peaksneaker.enums.Role;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;
@@ -32,9 +33,10 @@ public class User {
     @Column(unique = true, length = 20)
     private String phone;
 
-    @Column(nullable = false, length = 50)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, columnDefinition = "varchar(50)")
     @Builder.Default
-    private String role = "USER"; //USER ,ADMIN
+    private Role role = Role.USER; //USER ,ADMIN
 
     @Column(name = "is_verified", nullable = false)
     @Builder.Default
@@ -78,9 +80,8 @@ public class User {
         this.isActive = true;
     }
 
-    // Trả về true nếu người dùng có quyền Quản trị viên
     public boolean isAdmin() {
-        return "ADMIN".equalsIgnoreCase(this.role);
+        return this.role == Role.ADMIN;
     }
 
     // Cập nhật thông tin hồ sơ cá nhân, bỏ qua các trường null hoặc rỗng

@@ -3,6 +3,9 @@ package com.peaksneaker.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "categories")
 @Getter
@@ -31,7 +34,7 @@ public class Category {
 
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
     @Builder.Default
-    private java.util.List<Category> children = new java.util.ArrayList<>();
+    private List<Category> children = new ArrayList<>();
 
 
     // Trả về true nếu đây là danh mục gốc (không có danh mục cha)

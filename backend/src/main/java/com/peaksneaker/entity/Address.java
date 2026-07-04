@@ -44,7 +44,7 @@ public class Address {
     @Column(name = "ward_name", nullable = false, length = 100)
     private String wardName;
 
-    @Column(name = "street_detail", nullable = false, columnDefinition = "text")
+    @Column(name = "street_detail", columnDefinition = "text")
     private String streetDetail;
 
     @Column(name = "is_default", nullable = false)
