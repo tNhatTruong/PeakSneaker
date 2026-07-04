@@ -1,5 +1,7 @@
 package com.peaksneaker.entity;
 
+import com.peaksneaker.enums.OrderStatus;
+import com.peaksneaker.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -45,13 +47,15 @@ public class Order {
     @Column(name = "final_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal finalAmount;
 
-    @Column(nullable = false, length = 50)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false,columnDefinition = "varchar(50)")
     @Builder.Default
-    private String status = "PENDING"; // PENDING | SHIPPING | COMPLETED | CANCELLED
+    private OrderStatus status = OrderStatus.PENDING; // PENDING | SHIPPING | COMPLETED | CANCELLED
 
-    @Column(name = "payment_status", nullable = false, length = 50)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", columnDefinition = "varchar(50)",nullable = false)
     @Builder.Default
-    private String paymentStatus = "PENDING"; // PENDING | PAID | FAILED | REFUNDED
+    private PaymentStatus paymentStatus = PaymentStatus.PENDING; // PENDING | PAID | FAILED | REFUNDED
 
     @Column(name = "shipping_name", nullable = false)
     private String shippingName;
@@ -139,37 +143,41 @@ public class Order {
 
     // Trả về true nếu đơn hàng có thể bị hủy (chỉ khi PENDING)
     public boolean canCancel() {
-        return "PENDING".equalsIgnoreCase(this.status);
+        return this.status == OrderStatus.PENDING;
     }
 
-    // Hủy đơn hàng và hoàn trả tồn kho nếu đơn đã được xác nhận trước đó
+    // Hủy đơn hàng
     public void cancel() {
         if (!canCancel()) {
-            throw new IllegalStateException("Không thể hủy đơn hàng ở trạng thái hiện tại: " + this.status);
+            throw new IllegalStateException(
+                    "Không thể hủy đơn hàng ở trạng thái hiện tại: " + this.status);
         }
 
-        // Không cần xử lý kho ở bước hủy vì chỉ cho hủy lúc PENDING (kho chưa trừ)
-        // Nếu sau này thêm trạng thái CONFIRMED thì mới viết logic hoàn kho ở đây.
-
-        this.status = "CANCELLED";
+        // Chỉ cho hủy khi PENDING nên chưa cần hoàn kho
+        this.status = OrderStatus.CANCELLED;
     }
 
-    // Điều phối trạng thái đơn hàng theo luồng: PENDING -> SHIPPING -> COMPLETED
-    public void advanceStatus(String nextStatus) {
-        if (nextStatus == null) return;
-
-        String upperNext = nextStatus.toUpperCase();
-
-        if ("CANCELLED".equals(this.status) || "COMPLETED".equals(this.status)) {
-            throw new IllegalStateException("Không thể chuyển đổi trạng thái của đơn hàng đã hủy hoặc đã hoàn tất.");
+    // Chuyển trạng thái đơn hàng
+    public void advanceStatus(OrderStatus nextStatus) {
+        if (nextStatus == null) {
+            return;
         }
 
-        switch (upperNext) {
-            case "SHIPPING":
-                if (!"PENDING".equalsIgnoreCase(this.status)) {
-                    throw new IllegalStateException("Chỉ đơn hàng PENDING mới có thể chuyển sang SHIPPING.");
+        if (this.status == OrderStatus.CANCELLED
+                || this.status == OrderStatus.COMPLETED) {
+            throw new IllegalStateException(
+                    "Không thể chuyển đổi trạng thái của đơn hàng đã hủy hoặc đã hoàn tất.");
+        }
+
+        switch (nextStatus) {
+
+            case SHIPPING:
+                if (this.status != OrderStatus.PENDING) {
+                    throw new IllegalStateException(
+                            "Chỉ đơn hàng PENDING mới có thể chuyển sang SHIPPING.");
                 }
-                // Xác nhận giao hàng: trừ tồn kho các biến thể vật lý
+
+                // Trừ tồn kho
                 if (this.items != null) {
                     for (OrderItem item : this.items) {
                         if (item.getProductVariant() != null) {
@@ -177,44 +185,57 @@ public class Order {
                         }
                     }
                 }
-                this.status = "SHIPPING";
+
+                this.status = OrderStatus.SHIPPING;
                 break;
 
-            case "COMPLETED":
-                if (!"SHIPPING".equalsIgnoreCase(this.status)) {
-                    throw new IllegalStateException("Đơn hàng phải đang trong trạng thái giao mới có thể đánh dấu hoàn tất.");
+            case COMPLETED:
+                if (this.status != OrderStatus.SHIPPING) {
+                    throw new IllegalStateException(
+                            "Đơn hàng phải đang ở trạng thái SHIPPING mới có thể COMPLETED.");
                 }
-                this.status = "COMPLETED";
+
+                this.status = OrderStatus.COMPLETED;
                 break;
 
             default:
-                throw new IllegalArgumentException("Trạng thái chuyển tiếp đơn hàng không hợp lệ: " + nextStatus);
+                throw new IllegalArgumentException(
+                        "Trạng thái chuyển tiếp không hợp lệ: " + nextStatus);
         }
     }
 
-    // Điều chỉnh trạng thái thanh toán của đơn hàng theo luồng hợp lệ
-    public void updatePaymentStatus(String nextPaymentStatus) {
-        if (nextPaymentStatus == null) return;
-        String upperNext = nextPaymentStatus.toUpperCase();
-        
-        switch (upperNext) {
-            case "PENDING":
-                this.paymentStatus = "PENDING";
+    // Cập nhật trạng thái thanh toán
+    public void updatePaymentStatus(PaymentStatus nextPaymentStatus) {
+        if (nextPaymentStatus == null) {
+            return;
+        }
+
+        switch (nextPaymentStatus) {
+
+            case PENDING:
+                this.paymentStatus = PaymentStatus.PENDING;
                 break;
-            case "PAID":
-                this.paymentStatus = "PAID";
+
+            case PAID:
+                this.paymentStatus = PaymentStatus.PAID;
                 break;
-            case "FAILED":
-                this.paymentStatus = "FAILED";
+
+            case FAILED:
+                this.paymentStatus = PaymentStatus.FAILED;
                 break;
-            case "REFUNDED":
-                if (!"PAID".equalsIgnoreCase(this.paymentStatus)) {
-                    throw new IllegalStateException("Chỉ có thể hoàn tiền đối với đơn hàng đã thanh toán thành công");
+
+            case REFUNDED:
+                if (this.paymentStatus != PaymentStatus.PAID) {
+                    throw new IllegalStateException(
+                            "Chỉ có thể hoàn tiền đối với đơn hàng đã thanh toán.");
                 }
-                this.paymentStatus = "REFUNDED";
+
+                this.paymentStatus = PaymentStatus.REFUNDED;
                 break;
+
             default:
-                throw new IllegalArgumentException("Trạng thái thanh toán không hợp lệ: " + nextPaymentStatus);
+                throw new IllegalArgumentException(
+                        "Trạng thái thanh toán không hợp lệ: " + nextPaymentStatus);
         }
     }
 }

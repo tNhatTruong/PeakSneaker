@@ -1,12 +1,15 @@
 package com.peaksneaker.entity;
 
+import com.peaksneaker.enums.DiscountType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLDelete;
 import java.math.BigDecimal;
 import java.time.Instant;
 
 @Entity
 @Table(name = "vouchers")
+@SQLDelete(sql = "UPDATE vouchers SET is_deleted = true WHERE id=?")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -21,8 +24,9 @@ public class Voucher {
     @Column(nullable = false, unique = true, length = 50)
     private String code;
 
-    @Column(name = "discount_type", nullable = false, length = 20)
-    private String discountType; // PERCENTAGE | FIXED
+    @Enumerated(EnumType.STRING)
+    @Column(name = "discount_type", nullable = false, columnDefinition = "varchar(50)")
+    private DiscountType discountType; // PERCENTAGE | FIXED
 
     @Column(name = "discount_value", nullable = false, precision = 12, scale = 2)
     private BigDecimal discountValue;
@@ -53,6 +57,10 @@ public class Voucher {
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private Instant createdAt = Instant.now();
+
+    @Column(name = "is_deleted", nullable = false)
+    @Builder.Default
+    private Boolean isDeleted = false;
 
     // Kiểm tra xem mã giảm giá đã hết hạn hoặc chưa bắt đầu hiệu lực
     public boolean isExpired() {
@@ -104,22 +112,27 @@ public class Voucher {
             return BigDecimal.ZERO;
         }
 
-        BigDecimal discount = BigDecimal.ZERO;
+        BigDecimal discount;
 
-        if ("PERCENTAGE".equalsIgnoreCase(this.discountType)) {
-            // tính số tiền giảm theo phần trăm
-            BigDecimal fraction = this.discountValue.divide(BigDecimal.valueOf(100));
-            discount = orderSubtotal.multiply(fraction);
-            // áp trần giảm giá tối đa nếu có
-            if (this.maxDiscountAmount != null && discount.compareTo(this.maxDiscountAmount) > 0) {
-                discount = this.maxDiscountAmount;
-            }
-        } else if ("FIXED".equalsIgnoreCase(this.discountType)) {
-            // giảm một số tiền cố định
-            discount = this.discountValue;
+        switch (this.discountType) {
+            case PERCENTAGE:
+                // Tính số tiền giảm theo phần trăm
+                BigDecimal fraction = this.discountValue.divide(BigDecimal.valueOf(100));
+                discount = orderSubtotal.multiply(fraction);
+                // Áp trần giảm giá tối đa nếu có
+                if (this.maxDiscountAmount != null
+                        && discount.compareTo(this.maxDiscountAmount) > 0) {
+                    discount = this.maxDiscountAmount;
+                }
+                break;
+            case FIXED:
+                // Giảm một số tiền cố định
+                discount = this.discountValue;
+                break;
+            default:
+                throw new IllegalStateException("Loại giảm giá không hợp lệ: " + this.discountType);
         }
-
-        // đảm bảo giảm giá không vượt quá tổng đơn hàng
+        // Đảm bảo giảm giá không vượt quá tổng đơn hàng
         if (discount.compareTo(orderSubtotal) > 0) {
             discount = orderSubtotal;
         }
