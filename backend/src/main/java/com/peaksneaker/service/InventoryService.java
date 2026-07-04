@@ -24,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -51,7 +50,7 @@ public class InventoryService {
                 .color(request.getColor())
                 .size(request.getSize())
                 .sku(request.getSku())
-                .stockQuantity(0) // Số lượng ban đầu mặc định là 0
+                .stockQuantity(0) //mặc định0
                 .priceAdjustment(priceAdjustment)
                 .build();
 
