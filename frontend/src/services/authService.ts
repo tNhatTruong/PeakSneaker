@@ -43,5 +43,11 @@ export const AuthService = {
     const response = await apiClient.get<ApiResponse<UserResponse>>('/auth/me');
     // @ts-ignore
     return response.data as UserResponse;
+  },
+
+  loginWithGoogle: async (token: string) => {
+    const response = await apiClient.post<ApiResponse<LoginResponse>>('/auth/google', { token });
+    // @ts-ignore
+    return response.data as LoginResponse;
   }
 };
