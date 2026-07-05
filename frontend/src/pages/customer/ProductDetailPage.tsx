@@ -9,7 +9,7 @@ import toast from "react-hot-toast";
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { addToCart } = useCart();
+  const { cart, addToCart } = useCart();
   
   const [product, setProduct] = useState<ProductDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,6 +92,38 @@ export default function ProductDetailPage() {
         navigate("/login");
       } else {
         toast.error(err.response?.data?.message || "Đã xảy ra lỗi khi thêm vào giỏ hàng.");
+      }
+    } finally {
+      setAddingToCart(false);
+    }
+  };
+
+  const handleBuyNow = async () => {
+    if (!currentVariant) return;
+    if (currentVariant.stock <= 0) {
+      toast.error("Sản phẩm này đã hết hàng!");
+      return;
+    }
+
+    try {
+      setAddingToCart(true);
+      
+      // Kiểm tra xem sản phẩm (variant) đã có trong giỏ hàng chưa
+      const isAlreadyInCart = cart?.items.some(item => item.variantId === currentVariant.id);
+      
+      // Nếu chưa có thì mới thêm vào giỏ
+      if (!isAlreadyInCart) {
+        await addToCart(currentVariant.id, 1);
+      }
+      
+      // Sau đó chuyển thẳng sang checkout
+      navigate("/checkout");
+    } catch (err: any) {
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        toast.error("Vui lòng đăng nhập để mua hàng.");
+        navigate("/login");
+      } else {
+        toast.error(err.response?.data?.message || "Đã xảy ra lỗi khi mua hàng.");
       }
     } finally {
       setAddingToCart(false);
@@ -259,7 +291,8 @@ export default function ProductDetailPage() {
                   {addingToCart ? <Loader2 className="w-5 h-5 animate-spin" /> : "Thêm Vào Giỏ"}
                 </button>
                 <button 
-                  disabled={!currentVariant || currentVariant.stock <= 0}
+                  onClick={handleBuyNow}
+                  disabled={addingToCart || !currentVariant || currentVariant.stock <= 0}
                   className="flex-1 bg-white border-2 border-black text-black py-4 rounded-md font-bold uppercase tracking-widest hover:bg-zinc-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Mua Ngay
