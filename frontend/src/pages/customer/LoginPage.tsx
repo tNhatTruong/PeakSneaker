@@ -1,6 +1,7 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { AuthService } from "../../services/authService";
+import { useAuth } from "../../context/AuthContext";
 import { Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -10,6 +11,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   
+  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -20,12 +22,9 @@ export default function LoginPage() {
 
     try {
       const data = await AuthService.login(email, password);
-      // Save token and user info
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("fullName", data.fullName || "Người dùng");
       
-      // Trigger storage event so CartContext will refetch the cart
-      window.dispatchEvent(new Event("storage"));
+      // Use AuthContext login instead of manual localStorage
+      await login(data.token);
 
       // Redirect to previous page or home
       const from = location.state?.from?.pathname || "/";

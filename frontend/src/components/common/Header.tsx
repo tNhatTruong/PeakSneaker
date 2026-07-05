@@ -1,30 +1,19 @@
 import { ShoppingBag, Search, Menu, User, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import CartDrawer from "../customer/CartDrawer";
 import { useCart } from "../../context/CartContext";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Header() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { itemCount } = useCart();
-  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("token"));
-  const [userName, setUserName] = useState(localStorage.getItem("fullName") || "");
+  const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const handleStorageChange = () => {
-      setIsLoggedIn(!!localStorage.getItem("token"));
-      setUserName(localStorage.getItem("fullName") || "");
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
-
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("fullName");
-    window.dispatchEvent(new Event("storage"));
+    logout();
     navigate("/login");
   };
 
@@ -62,7 +51,7 @@ export default function Header() {
                 <Search className="h-5 w-5" />
               </button>
               
-              {isLoggedIn ? (
+              {isAuthenticated ? (
                 <div className="relative group">
                   <Link 
                     to="/profile" 
@@ -71,7 +60,7 @@ export default function Header() {
                   >
                     <User className="h-5 w-5" />
                     <span className="text-sm font-medium hidden md:block">
-                      {userName.split(" ").pop()}
+                      {user?.fullName?.split(" ").pop()}
                     </span>
                   </Link>
                   <div className="absolute right-0 w-48 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">

@@ -1,4 +1,4 @@
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation, Navigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Package,
@@ -13,10 +13,20 @@ import {
   Menu
 } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "../../context/AuthContext";
 
 export default function AdminLayout() {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
+
+  if (isLoading) {
+    return <div className="flex h-screen items-center justify-center bg-zinc-50">Đang tải...</div>;
+  }
+
+  if (!isAuthenticated || user?.role !== 'ADMIN') {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
 
   const navItems = [
     { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
@@ -65,10 +75,10 @@ export default function AdminLayout() {
         </nav>
 
         <div className="absolute bottom-0 w-full p-4 border-t border-zinc-800">
-          <Link to="/" className="flex items-center w-full px-4 py-3 text-sm font-medium text-zinc-400 rounded-md hover:bg-white/5 hover:text-white transition-colors mb-2">
+          <button onClick={logout} className="flex items-center w-full px-4 py-3 text-sm font-medium text-zinc-400 rounded-md hover:bg-white/5 hover:text-white transition-colors mb-2">
             <LogOut className="w-5 h-5 mr-3" />
-            Về Trang chủ
-          </Link>
+            Đăng xuất
+          </button>
         </div>
       </aside>
 
