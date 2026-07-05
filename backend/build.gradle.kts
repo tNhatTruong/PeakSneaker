@@ -37,6 +37,9 @@ dependencies {
 
 	//cloudinary
     implementation("com.cloudinary:cloudinary-http44:1.39.0")
+	// Google API Client for Token Verification
+	implementation("com.google.api-client:google-api-client:2.2.0")
+	implementation("com.google.http-client:google-http-client-gson:1.43.3")
 
 }
 

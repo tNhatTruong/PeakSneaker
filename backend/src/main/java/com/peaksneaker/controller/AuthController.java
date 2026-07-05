@@ -43,4 +43,10 @@ public class AuthController {
         UserResponse response = authService.getMe(userDetails.getId());
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin tài khoản thành công!", response));
     }
+
+    @PostMapping("/google")
+    public ResponseEntity<ApiResponse<LoginResponse>> loginWithGoogle(@Valid @RequestBody com.peaksneaker.dto.request.GoogleLoginRequest request) {
+        LoginResponse response = authService.loginWithGoogle(request.getToken());
+        return ResponseEntity.ok(ApiResponse.success("Đăng nhập bằng Google thành công!", response));
+    }
 }
