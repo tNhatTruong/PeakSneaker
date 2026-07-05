@@ -58,7 +58,7 @@ public class Voucher {
     @Builder.Default
     private Instant createdAt = Instant.now();
 
-    @Column(name = "is_deleted", nullable = false)
+    @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
     private Boolean isDeleted = false;
 

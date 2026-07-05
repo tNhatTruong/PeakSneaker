@@ -1,6 +1,8 @@
 package com.peaksneaker;
 
 import com.peaksneaker.entity.*;
+import com.peaksneaker.enums.DiscountType;
+import com.peaksneaker.enums.OrderStatus;
 import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -28,7 +30,7 @@ class DomainLogicTests {
         // Active, valid PERCENTAGE voucher (10% off, max discount 15, min order 50)
         Voucher voucher = Voucher.builder()
                 .code("SALE10")
-                .discountType("PERCENTAGE")
+                .discountType(DiscountType.PERCENTAGE)
                 .discountValue(BigDecimal.valueOf(10.00))
                 .minOrderAmount(BigDecimal.valueOf(50.00))
                 .maxDiscountAmount(BigDecimal.valueOf(15.00))
@@ -75,7 +77,7 @@ class DomainLogicTests {
 
         Voucher voucher = Voucher.builder()
                 .code("FIXED50")
-                .discountType("FIXED")
+                .discountType(DiscountType.FIXED)
                 .discountValue(BigDecimal.valueOf(50.00))
                 .isActive(true)
                 .build();
@@ -126,11 +128,11 @@ class DomainLogicTests {
         item.calculateSubtotal();
         order.addItem(item);
 
-        assertEquals("PENDING", order.getStatus());
+        assertEquals(OrderStatus.PENDING, order.getStatus());
 
         // 1. Advance to SHIPPING -> Stock should decrease from 10 to 7
-        order.advanceStatus("SHIPPING");
-        assertEquals("SHIPPING", order.getStatus());
+        order.advanceStatus(OrderStatus.SHIPPING);
+        assertEquals(OrderStatus.SHIPPING, order.getStatus());
         assertEquals(7, variant.getStockQuantity());
 
         // 2. Cancel order from SHIPPING is not allowed directly without logic, but for test:
@@ -140,7 +142,7 @@ class DomainLogicTests {
         // 3. Let's create another PENDING order and cancel it
         Order pendingOrder = Order.builder().build();
         pendingOrder.cancel();
-        assertEquals("CANCELLED", pendingOrder.getStatus());
+        assertEquals(OrderStatus.CANCELLED, pendingOrder.getStatus());
     }
 
     @Test
