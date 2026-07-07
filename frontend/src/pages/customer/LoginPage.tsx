@@ -22,9 +22,14 @@ export default function LoginPage() {
       try {
         const data = await AuthService.loginWithGoogle(tokenResponse.access_token);
         await login(data.token);
-        const from = location.state?.from?.pathname || "/";
         toast.success("Đăng nhập bằng Google thành công!");
-        navigate(from, { replace: true });
+        
+        if (data.role === 'ROLE_ADMIN' || data.role === 'ADMIN') {
+          navigate("/admin/dashboard", { replace: true });
+        } else {
+          const from = location.state?.from?.pathname || "/";
+          navigate(from, { replace: true });
+        }
       } catch (err: any) {
         toast.error(err.response?.data?.message || "Đăng nhập Google thất bại.");
       } finally {
@@ -47,10 +52,16 @@ export default function LoginPage() {
       // Use AuthContext login instead of manual localStorage
       await login(data.token);
 
-      // Redirect to previous page or home
-      const from = location.state?.from?.pathname || "/";
       toast.success("Đăng nhập thành công!");
-      navigate(from, { replace: true });
+      
+      // Redirect to admin dashboard if role is admin
+      if (data.role === 'ROLE_ADMIN' || data.role === 'ADMIN') {
+        navigate("/admin/dashboard", { replace: true });
+      } else {
+        // Redirect to previous page or home
+        const from = location.state?.from?.pathname || "/";
+        navigate(from, { replace: true });
+      }
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || "Đăng nhập thất bại. Vui lòng thử lại.";
       setError(errorMessage);
