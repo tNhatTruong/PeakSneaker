@@ -20,5 +20,6 @@ public class UserResponse {
     private Role role;
     private Boolean isVerified;
     private Boolean isActive;
+    private Boolean hasPassword;
     private java.time.Instant createdAt;
 }

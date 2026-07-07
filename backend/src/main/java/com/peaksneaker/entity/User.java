@@ -42,6 +42,10 @@ public class User {
     @Builder.Default
     private Boolean isVerified = false;
 
+    @Column(name = "has_password", columnDefinition = "boolean default true")
+    @Builder.Default
+    private Boolean hasPassword = true;
+
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private Boolean isActive = true;

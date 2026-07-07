@@ -86,6 +86,7 @@ public class AuthService {
                 .userId(user.getId())
                 .fullName(user.getFullname())
                 .role(user.getRole())
+                .hasPassword(user.getHasPassword())
                 .build();
     }
 
@@ -104,6 +105,7 @@ public class AuthService {
                 .fullName(user.getFullname())
                 .phone(user.getPhone())
                 .role(user.getRole())
+                .hasPassword(user.getHasPassword())
                 .build();
     }
 
@@ -145,6 +147,7 @@ public class AuthService {
                         .role(Role.USER)
                         .isActive(true)
                         .isVerified(true) // Google đã xác thực email
+                        .hasPassword(false)
                         .build();
                 user = userRepository.save(user);
 
@@ -167,10 +170,50 @@ public class AuthService {
                     .userId(user.getId())
                     .fullName(user.getFullname())
                     .role(user.getRole())
+                    .hasPassword(user.getHasPassword())
                     .build();
 
         } catch (Exception e) {
             throw new IllegalArgumentException("Lỗi xác thực Google: " + e.getMessage());
         }
+    }
+
+    @Transactional
+    public UserResponse updateMe(Long userId, com.peaksneaker.dto.request.UpdateUserRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng."));
+        
+        user.updateProfile(request.getFirstName(), request.getLastName(), request.getPhone());
+        userRepository.save(user);
+        
+        return UserResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .fullName(user.getFullname())
+                .phone(user.getPhone())
+                .role(user.getRole())
+                .build();
+    }
+    @Transactional
+    public void changePassword(Long userId, com.peaksneaker.dto.request.ChangePasswordRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng"));
+
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new IllegalArgumentException("Mật khẩu xác nhận không khớp.");
+        }
+
+        if (Boolean.TRUE.equals(user.getHasPassword())) {
+            if (request.getOldPassword() == null || request.getOldPassword().isEmpty()) {
+                throw new IllegalArgumentException("Vui lòng nhập mật khẩu hiện tại.");
+            }
+            if (!passwordEncoder.matches(request.getOldPassword(), user.getPasswordHash())) {
+                throw new IllegalArgumentException("Mật khẩu hiện tại không đúng.");
+            }
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setHasPassword(true);
+        userRepository.save(user);
     }
 }
