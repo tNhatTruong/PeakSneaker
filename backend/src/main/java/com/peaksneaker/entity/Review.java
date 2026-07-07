@@ -40,4 +40,8 @@ public class Review {
     @Column(name = "is_deleted")
     @Builder.Default
     private Boolean isDeleted = false;
+
+    @Column(name = "is_edited")
+    @Builder.Default
+    private Boolean isEdited = false;
 }
