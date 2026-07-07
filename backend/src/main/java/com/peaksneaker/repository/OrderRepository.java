@@ -31,4 +31,7 @@ public interface OrderRepository extends JpaRepository<Order, Long>, org.springf
 
     @Query("SELECT SUM(o.finalAmount) FROM Order o WHERE o.status = com.peaksneaker.enums.OrderStatus.COMPLETED AND o.createdAt BETWEEN :start AND :end")
     BigDecimal calculateRevenueBetween(@Param("start") Instant start, @Param("end") Instant end);
+
+    @Query("SELECT CASE WHEN COUNT(o) > 0 THEN true ELSE false END FROM Order o JOIN o.items i WHERE o.user.id = :userId AND i.productVariant.product.id = :productId AND o.status = com.peaksneaker.enums.OrderStatus.COMPLETED")
+    boolean existsByUserIdAndProductIdAndStatusCompleted(@Param("userId") Long userId, @Param("productId") Long productId);
 }

@@ -52,12 +52,21 @@ public class OrderController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<com.peaksneaker.dto.response.PaginatedResponse<Order>>> getOrders(
+    public ResponseEntity<ApiResponse<com.peaksneaker.dto.response.PaginatedResponse<com.peaksneaker.dto.response.OrderResponse>>> getOrders(
             @AuthenticationPrincipal UserDetailsImpl userDetails,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         
         var orders = orderService.getOrders(userDetails.getId(), page, size);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách đơn hàng thành công!", orders));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<com.peaksneaker.dto.response.OrderResponse>> getOrderById(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @PathVariable Long id) {
+        
+        var order = orderService.getOrderById(userDetails.getId(), id);
+        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết đơn hàng thành công!", order));
     }
 }

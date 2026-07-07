@@ -18,4 +18,8 @@ public class CheckoutRequest {
     
     // Ghi chú đơn hàng (tùy chọn)
     private String note;
+    
+    // Mua ngay (không qua giỏ hàng)
+    private Long buyNowVariantId;
+    private Integer buyNowQuantity;
 }
