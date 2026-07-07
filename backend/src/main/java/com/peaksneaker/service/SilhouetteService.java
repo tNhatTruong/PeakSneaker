@@ -1,7 +1,13 @@
 package com.peaksneaker.service;
 
+import com.peaksneaker.dto.request.SilhouetteRequest;
 import com.peaksneaker.dto.response.SilhouetteResponse;
+import com.peaksneaker.entity.Brand;
+import com.peaksneaker.entity.Silhouette;
+import com.peaksneaker.repository.BrandRepository;
 import com.peaksneaker.repository.SilhouetteRepository;
+import com.peaksneaker.service.cloudservice.CloudinaryService;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,47 +20,53 @@ import java.util.stream.Collectors;
 public class SilhouetteService {
 
     private final SilhouetteRepository silhouetteRepository;
-    private final com.peaksneaker.repository.BrandRepository brandRepository;
-    private final com.peaksneaker.service.cloudservice.CloudinaryService cloudService;
+    private final BrandRepository brandRepository;
+    private final CloudinaryService cloudService;
 
     @Transactional(readOnly = true)
     public List<SilhouetteResponse> getSilhouettesByBrandId(Long brandId) {
         return silhouetteRepository.findByBrandIdAndIsDeletedFalse(brandId).stream()
-                .map(SilhouetteResponse::fromEntity)
+                .map(this::convertToResponseWithFullUrl)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<SilhouetteResponse> getAllSilhouettes() {
         return silhouetteRepository.findByIsDeletedFalse().stream()
-                .map(SilhouetteResponse::fromEntity)
+                .map(this::convertToResponseWithFullUrl)
                 .collect(Collectors.toList());
     }
 
     @Transactional
-    public SilhouetteResponse createSilhouette(com.peaksneaker.dto.request.SilhouetteRequest request) {
-        com.peaksneaker.entity.Brand brand = brandRepository.findById(request.getBrandId())
+    public SilhouetteResponse createSilhouette(SilhouetteRequest request) {
+        Brand brand = brandRepository.findById(request.getBrandId())
                 .orElseThrow(() -> new RuntimeException("Brand not found"));
 
-        String imageUrl = null;
+        String imageName = null;
         if (request.getImage() != null && !request.getImage().isEmpty()) {
             try {
-                String fileName = cloudService.upload(request.getImage());
-                imageUrl = cloudService.creteImageUrl(fileName);
+                // Chỉ lấy và lưu tên file ảnh gốc
+                imageName = cloudService.upload(request.getImage());
             } catch (Exception e) {
                 throw new RuntimeException("Lỗi upload ảnh dòng giày: " + e.getMessage());
             }
         }
 
-        com.peaksneaker.entity.Silhouette silhouette = com.peaksneaker.entity.Silhouette.builder()
+        Silhouette silhouette = Silhouette.builder()
                 .name(request.getName())
                 .brand(brand)
-                .imageUrl(imageUrl)
+                .imageUrl(imageName)
                 .isDeleted(false)
                 .build();
 
         silhouette = silhouetteRepository.save(silhouette);
-        return SilhouetteResponse.fromEntity(silhouette);
+
+        String fullUrl = (imageName != null) ? cloudService.creteImageUrl(imageName) : null;
+        return SilhouetteResponse.builder()
+                .id(silhouette.getId())
+                .name(silhouette.getName())
+                .imageUrl(fullUrl)
+                .build();
     }
 
     @Transactional
@@ -72,17 +84,23 @@ public class SilhouetteService {
         silhouette.setName(request.getName());
         silhouette.setBrand(brand);
 
+        String imageName = null;
         if (request.getImage() != null && !request.getImage().isEmpty()) {
             try {
-                String fileName = cloudService.upload(request.getImage());
-                silhouette.setImageUrl(cloudService.creteImageUrl(fileName));
+                imageName = cloudService.upload(request.getImage());
+                silhouette.setImageUrl(imageName);
             } catch (Exception e) {
                 throw new RuntimeException("Lỗi upload ảnh dòng giày: " + e.getMessage());
             }
         }
 
         silhouette = silhouetteRepository.save(silhouette);
-        return SilhouetteResponse.fromEntity(silhouette);
+       String fullUrl = (imageName != null) ? cloudService.creteImageUrl(imageName) : null;
+        return SilhouetteResponse.builder()
+                .id(silhouette.getId())
+                .name(silhouette.getName())
+                .imageUrl(fullUrl)
+                .build();
     }
 
     @Transactional
@@ -91,5 +109,15 @@ public class SilhouetteService {
                 .orElseThrow(() -> new RuntimeException("Silhouette not found"));
         silhouette.setDeleted(true);
         silhouetteRepository.save(silhouette);
+    }
+
+    private SilhouetteResponse convertToResponseWithFullUrl(com.peaksneaker.entity.Silhouette silhouette) {
+        if (silhouette == null) return null;
+        String fullUrl = null;
+        if (silhouette.getImageUrl() != null && !silhouette.getImageUrl().isEmpty()) {
+            fullUrl = cloudService.creteImageUrl(silhouette.getImageUrl());
+        }
+        silhouette.setImageUrl(fullUrl); 
+        return SilhouetteResponse.fromEntity(silhouette);
     }
 }

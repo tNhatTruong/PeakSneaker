@@ -54,16 +54,18 @@ export default function BrandsPage() {
               {/* Silhouettes Spotlight Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-6 gap-y-12 mb-10">
                 {brand.silhouettes?.map((item) => (
-                  <Link key={item.id} to={`/shop?brand=${brand.name.toLowerCase()}&silhouette=${item.name.toLowerCase()}`} className="group flex flex-col items-center">
-                    <div className="w-full h-24 md:h-32 mb-4 flex items-center justify-center transition-transform duration-300 group-hover:-translate-y-2">
-                      <img 
-                        src={item.imageUrl || 'https://placehold.co/300x300/png?text=No+Image'} 
-                        alt={item.name} 
-                        className="w-full h-full object-contain mix-blend-multiply drop-shadow-sm" 
-                        loading="lazy"
-                      />
+                  <Link key={item.id} to={`/shop?brand=${brand.name.toLowerCase()}&silhouette=${item.name.toLowerCase()}`} className="group flex flex-col items-center h-full">
+                    <div className="w-full relative pt-[75%] mb-4 bg-zinc-50/50 hover:bg-zinc-100 rounded-2xl overflow-hidden transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-md border border-zinc-100">
+                      <div className="absolute inset-0 p-4 flex items-center justify-center">
+                        <img 
+                          src={item.imageUrl || 'https://placehold.co/300x300/png?text=No+Image'} 
+                          alt={item.name} 
+                          className="w-full h-full object-contain mix-blend-multiply drop-shadow-sm transition-transform duration-500 group-hover:scale-105" 
+                          loading="lazy"
+                        />
+                      </div>
                     </div>
-                    <span className="font-bold text-zinc-900 text-sm group-hover:text-zinc-500 transition-colors">
+                    <span className="font-bold text-zinc-900 text-sm group-hover:text-zinc-500 transition-colors text-center mt-auto">
                       {item.name}
                     </span>
                   </Link>
