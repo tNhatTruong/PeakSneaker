@@ -1,8 +1,10 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { AuthService } from "../../services/authService";
+import { useAuth } from "../../context/AuthContext";
 import { Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useGoogleLogin } from '@react-oauth/google';
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -10,8 +12,34 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   
+  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setLoading(true);
+      try {
+        const data = await AuthService.loginWithGoogle(tokenResponse.access_token);
+        await login(data.token);
+        toast.success("Đăng nhập bằng Google thành công!");
+        
+        if (data.role === 'ROLE_ADMIN' || data.role === 'ADMIN') {
+          navigate("/admin/dashboard", { replace: true });
+        } else {
+          const from = location.state?.from?.pathname || "/";
+          navigate(from, { replace: true });
+        }
+      } catch (err: any) {
+        toast.error(err.response?.data?.message || "Đăng nhập Google thất bại.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    onError: () => {
+      toast.error("Đăng nhập Google thất bại.");
+    }
+  });
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,17 +48,20 @@ export default function LoginPage() {
 
     try {
       const data = await AuthService.login(email, password);
-      // Save token and user info
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("fullName", data.fullName || "Người dùng");
       
-      // Trigger storage event so CartContext will refetch the cart
-      window.dispatchEvent(new Event("storage"));
+      // Use AuthContext login instead of manual localStorage
+      await login(data.token);
 
-      // Redirect to previous page or home
-      const from = location.state?.from?.pathname || "/";
       toast.success("Đăng nhập thành công!");
-      navigate(from, { replace: true });
+      
+      // Redirect to admin dashboard if role is admin
+      if (data.role === 'ROLE_ADMIN' || data.role === 'ADMIN') {
+        navigate("/admin/dashboard", { replace: true });
+      } else {
+        // Redirect to previous page or home
+        const from = location.state?.from?.pathname || "/";
+        navigate(from, { replace: true });
+      }
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || "Đăng nhập thất bại. Vui lòng thử lại.";
       setError(errorMessage);
@@ -116,7 +147,12 @@ export default function LoginPage() {
             </div>
 
             <div className="mt-6">
-              <button type="button" className="w-full flex items-center justify-center px-4 py-2.5 border border-zinc-300 rounded-md shadow-sm bg-white text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors">
+              <button 
+                type="button" 
+                onClick={() => googleLogin()}
+                disabled={loading}
+                className="w-full flex items-center justify-center px-4 py-2.5 border border-zinc-300 rounded-md shadow-sm bg-white text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors disabled:opacity-50"
+              >
                 <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                   <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>

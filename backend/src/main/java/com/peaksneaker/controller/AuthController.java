@@ -43,4 +43,32 @@ public class AuthController {
         UserResponse response = authService.getMe(userDetails.getId());
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin tài khoản thành công!", response));
     }
+
+    @PostMapping("/google")
+    public ResponseEntity<ApiResponse<LoginResponse>> loginWithGoogle(@Valid @RequestBody com.peaksneaker.dto.request.GoogleLoginRequest request) {
+        LoginResponse response = authService.loginWithGoogle(request.getToken());
+        return ResponseEntity.ok(ApiResponse.success("Đăng nhập bằng Google thành công!", response));
+    }
+    @PutMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<UserResponse>> updateMe(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @Valid @RequestBody com.peaksneaker.dto.request.UpdateUserRequest request) {
+        if (userDetails == null) {
+            throw new IllegalArgumentException("Người dùng chưa được xác thực.");
+        }
+        UserResponse response = authService.updateMe(userDetails.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật thông tin thành công!", response));
+    }
+    @PostMapping("/password")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @Valid @RequestBody com.peaksneaker.dto.request.ChangePasswordRequest request,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+        if (userDetails == null) {
+            throw new IllegalArgumentException("Người dùng chưa được xác thực.");
+        }
+        authService.changePassword(userDetails.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật mật khẩu thành công!", null));
+    }
 }

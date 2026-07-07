@@ -67,6 +67,41 @@ public class VoucherService {
         voucherRepository.deleteById(id);
     }
 
+    public com.peaksneaker.dto.response.VoucherCheckResponse checkVoucher(com.peaksneaker.dto.request.VoucherCheckRequest request) {
+        java.util.Optional<Voucher> voucherOpt = voucherRepository.findByCode(request.getCode());
+        
+        if (voucherOpt.isEmpty()) {
+            return com.peaksneaker.dto.response.VoucherCheckResponse.builder()
+                    .isValid(false)
+                    .message("Mã giảm giá không tồn tại")
+                    .discountAmount(java.math.BigDecimal.ZERO)
+                    .build();
+        }
+        
+        Voucher voucher = voucherOpt.get();
+        if (!voucher.isValidForOrder(request.getSubtotal())) {
+            String msg = "Mã giảm giá không hợp lệ hoặc không đủ điều kiện áp dụng";
+            if (voucher.isExpired()) msg = "Mã giảm giá đã hết hạn";
+            else if (voucher.isLimitReached()) msg = "Mã giảm giá đã hết lượt sử dụng";
+            else if (voucher.getMinOrderAmount() != null && request.getSubtotal().compareTo(voucher.getMinOrderAmount()) < 0) {
+                msg = "Đơn hàng chưa đạt giá trị tối thiểu " + String.format("%,.0f", voucher.getMinOrderAmount()) + "đ";
+            }
+            
+            return com.peaksneaker.dto.response.VoucherCheckResponse.builder()
+                    .isValid(false)
+                    .message(msg)
+                    .discountAmount(java.math.BigDecimal.ZERO)
+                    .build();
+        }
+        
+        java.math.BigDecimal discount = voucher.calculateDiscount(request.getSubtotal());
+        return com.peaksneaker.dto.response.VoucherCheckResponse.builder()
+                .isValid(true)
+                .message("Áp dụng mã giảm giá thành công")
+                .discountAmount(discount)
+                .build();
+    }
+
     private VoucherResponse toResponse(Voucher voucher) {
         return VoucherResponse.builder()
                 .id(voucher.getId())

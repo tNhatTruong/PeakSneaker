@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class OrderItemResponse {
     private Long id;
+    private Long productId;
     private Long productVariantId;
     private String productName;
     private String sku;
@@ -20,4 +21,5 @@ public class OrderItemResponse {
     private Integer quantity;
     private BigDecimal unitPrice;
     private BigDecimal subtotal;
+    private String imageUrl;
 }

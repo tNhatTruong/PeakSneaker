@@ -5,6 +5,7 @@ export interface LoginResponse {
   userId: number;
   fullName: string;
   role: string;
+  hasPassword?: boolean;
 }
 
 export interface UserResponse {
@@ -14,6 +15,7 @@ export interface UserResponse {
   phone: string;
   address: string;
   role: string;
+  hasPassword?: boolean;
   createdAt: string;
 }
 
@@ -43,5 +45,23 @@ export const AuthService = {
     const response = await apiClient.get<ApiResponse<UserResponse>>('/auth/me');
     // @ts-ignore
     return response.data as UserResponse;
+  },
+
+  loginWithGoogle: async (token: string) => {
+    const response = await apiClient.post<ApiResponse<LoginResponse>>('/auth/google', { token });
+    // @ts-ignore
+    return response.data as LoginResponse;
+  },
+
+  updateMe: async (data: { firstName: string; lastName: string; phone: string }) => {
+    const response = await apiClient.put<ApiResponse<UserResponse>>('/auth/me', data);
+    // @ts-ignore
+    return response.data as UserResponse;
+  },
+
+  changePassword: async (data: { oldPassword?: string; newPassword: string; confirmPassword: string }) => {
+    const response = await apiClient.post<ApiResponse<void>>('/auth/password', data);
+    // @ts-ignore
+    return response.data;
   }
 };

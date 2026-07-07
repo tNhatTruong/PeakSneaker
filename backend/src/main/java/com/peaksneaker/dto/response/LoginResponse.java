@@ -15,4 +15,5 @@ public class LoginResponse {
     private Long userId;
     private String fullName;
     private Role role;
+    private Boolean hasPassword;
 }

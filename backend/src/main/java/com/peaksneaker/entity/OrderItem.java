@@ -43,6 +43,9 @@ public class OrderItem {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal subtotal;
 
+    @Column(name = "image_url")
+    private String imageUrl;
+
     // Tính tổng giá tiền của dòng vật phẩm: giá đã chốt chặn * số lượng
     public void calculateSubtotal() {
         if (this.unitPrice == null) {

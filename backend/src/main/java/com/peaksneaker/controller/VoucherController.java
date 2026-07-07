@@ -47,4 +47,10 @@ public class VoucherController {
         voucherService.deleteVoucher(id);
         return ResponseEntity.ok(ApiResponse.success("Xóa voucher thành công", null));
     }
+
+    @PostMapping("/check")
+    public ResponseEntity<ApiResponse<com.peaksneaker.dto.response.VoucherCheckResponse>> checkVoucher(@RequestBody com.peaksneaker.dto.request.VoucherCheckRequest request) {
+        com.peaksneaker.dto.response.VoucherCheckResponse response = voucherService.checkVoucher(request);
+        return ResponseEntity.ok(ApiResponse.success("Kiểm tra voucher", response));
+    }
 }

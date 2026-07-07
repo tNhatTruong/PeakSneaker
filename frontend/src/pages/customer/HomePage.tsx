@@ -4,6 +4,7 @@ import { ShieldCheck, Truck, RefreshCcw } from "lucide-react";
 import ProductCard from "../../components/customer/ProductCard";
 import { ProductService, type ProductResponse } from "../../services/productService";
 import { BrandService, type Brand } from "../../services/brandService";
+import heroBgImg from "../../assets/images/hero-bg.png";
 
 export default function HomePage() {
   const [bestSellers, setBestSellers] = useState<ProductResponse[]>([]);
@@ -33,11 +34,11 @@ export default function HomePage() {
     <div className="w-full">
       {/* 1. Hero Section */}
       <section className="relative h-[85vh] w-full bg-zinc-100 flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 z-0 bg-zinc-200">
           <img 
-            src="https://images.unsplash.com/photo-1552346154-21d32810baa3?auto=format&fit=crop&q=80&w=2000" 
+            src={heroBgImg} 
             alt="Hero Background" 
-            className="w-full h-full object-cover object-center opacity-80"
+            className="w-full h-full object-cover object-center opacity-60 mix-blend-multiply"
           />
         </div>
         <div className="relative z-10 text-center px-4 max-w-4xl mx-auto mt-20">
@@ -47,16 +48,16 @@ export default function HomePage() {
           <p className="text-lg md:text-xl text-zinc-800 font-medium mb-10 max-w-2xl mx-auto drop-shadow-sm">
             Khám phá những bộ sưu tập độc quyền và giới hạn. <br className="hidden md:block" /> Nâng tầm phong cách cá nhân của bạn.
           </p>
-          <div className="flex justify-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-4 w-full max-w-sm sm:max-w-none mx-auto">
             <Link 
               to="/shop" 
-              className="inline-block bg-zinc-900 text-white px-10 py-4 text-sm font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors"
+              className="flex items-center justify-center w-full sm:w-auto bg-zinc-900 text-white px-8 sm:px-10 py-3.5 sm:py-4 text-xs sm:text-sm font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors whitespace-nowrap"
             >
               Shop Now
             </Link>
             <Link 
-              to="/shop?category=new" 
-              className="inline-block bg-white text-zinc-900 px-10 py-4 text-sm font-bold uppercase tracking-widest hover:bg-zinc-100 transition-colors"
+              to="/shop?sortBy=createdAt&sortDirection=desc" 
+              className="flex items-center justify-center w-full sm:w-auto bg-white text-zinc-900 px-8 sm:px-10 py-3.5 sm:py-4 text-xs sm:text-sm font-bold uppercase tracking-widest hover:bg-zinc-100 transition-colors whitespace-nowrap"
             >
               New Arrivals
             </Link>
@@ -94,7 +95,7 @@ export default function HomePage() {
             <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-zinc-900">Best Sellers</h2>
             <p className="text-zinc-500 mt-2 font-medium">Những thiết kế được săn đón nhiều nhất trong tháng.</p>
           </div>
-          <Link to="/shop?sort=popular" className="hidden md:inline-block text-sm font-bold uppercase tracking-widest text-zinc-900 hover:text-zinc-500 transition-colors">
+          <Link to="/shop?sortBy=isFeatured&sortDirection=desc" className="hidden md:inline-block text-sm font-bold uppercase tracking-widest text-zinc-900 hover:text-zinc-500 transition-colors">
             Xem tất cả &rarr;
           </Link>
         </div>
@@ -121,7 +122,7 @@ export default function HomePage() {
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {brands.map((brand, idx) => (
-              <Link key={idx} to={`/shop?brand=${brand.name.toLowerCase()}`} className="group relative h-64 overflow-hidden bg-zinc-200">
+              <Link key={idx} to={`/shop?brandId=${brand.id}`} className="group relative h-64 overflow-hidden bg-zinc-200">
                 <img 
                   src={brand.logoUrl || 'https://placehold.co/600x600/png?text=No+Logo'} 
                   alt={brand.name} 
@@ -143,7 +144,7 @@ export default function HomePage() {
             <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-zinc-900">New Arrivals</h2>
             <p className="text-zinc-500 mt-2 font-medium">Cập nhật ngay những xu hướng mới nhất.</p>
           </div>
-          <Link to="/shop?category=new" className="hidden md:inline-block text-sm font-bold uppercase tracking-widest text-zinc-900 hover:text-zinc-500 transition-colors">
+          <Link to="/shop?sortBy=createdAt&sortDirection=desc" className="hidden md:inline-block text-sm font-bold uppercase tracking-widest text-zinc-900 hover:text-zinc-500 transition-colors">
             Xem tất cả &rarr;
           </Link>
         </div>

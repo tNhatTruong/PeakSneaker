@@ -1,5 +1,7 @@
 package com.peaksneaker.service;
 
+import com.peaksneaker.service.cloudservice.CloudinaryService;
+
 import com.peaksneaker.dto.request.CheckoutRequest;
 import com.peaksneaker.dto.request.OrderFilterDto;
 import com.peaksneaker.dto.response.PaginatedResponse;
@@ -17,8 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
 
@@ -30,18 +30,12 @@ public class OrderService {
     private final VoucherRepository voucherRepository;
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
+    private final CloudinaryService cloudinaryService;
 
     @Transactional
     public Order checkout(Long userId, CheckoutRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng."));
-
-        Cart cart = cartRepository.findByUser(user)
-                .orElseThrow(() -> new IllegalArgumentException("Giỏ hàng trống."));
-
-        if (cart.getItems() == null || cart.getItems().isEmpty()) {
-            throw new IllegalArgumentException("Không có sản phẩm nào trong giỏ hàng.");
-        }
 
         Address address = addressRepository.findByIdAndUserId(request.getAddressId(), userId)
                 .orElseThrow(() -> new IllegalArgumentException("Địa chỉ giao hàng không hợp lệ hoặc không thuộc về bạn."));
@@ -68,51 +62,147 @@ public class OrderService {
                 .shippingFee(new BigDecimal("30000")) // Phí vận chuyển mặc định tạm thời
                 .build();
 
-        for (CartItem cartItem : cart.getItems()) {
-            ProductVariant variant = cartItem.getProductVariant();
+        if (request.getBuyNowVariantId() != null && request.getBuyNowQuantity() != null) {
+            // MUA NGAY - CHỈ THANH TOÁN 1 SẢN PHẨM NÀY, BỎ QUA GIỎ HÀNG
+            com.peaksneaker.repository.ProductVariantRepository variantRepo = 
+                org.springframework.web.context.support.WebApplicationContextUtils.getRequiredWebApplicationContext(
+                    ((org.springframework.web.context.request.ServletRequestAttributes) org.springframework.web.context.request.RequestContextHolder.getRequestAttributes()).getRequest().getServletContext()
+                ).getBean(com.peaksneaker.repository.ProductVariantRepository.class);
+            
+            ProductVariant variant = variantRepo.findById(request.getBuyNowVariantId())
+                    .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy phân loại sản phẩm."));
+            
             Product product = variant.getProduct();
+            String imageUrl = null;
+            if (product != null && product.getImages() != null && !product.getImages().isEmpty()) {
+                String imageName = product.getImages().stream()
+                        .filter(com.peaksneaker.entity.Image::getIsPrimary)
+                        .findFirst()
+                        .map(com.peaksneaker.entity.Image::getImageName)
+                        .orElse(product.getImages().get(0).getImageName());
+                try {
+                    imageUrl = cloudinaryService.creteImageUrl(imageName);
+                } catch (Exception ignored) {}
+            }
+
             OrderItem orderItem = OrderItem.builder()
                     .productVariant(variant)
                     .productName(product != null ? product.getName() : "Sản phẩm")
                     .sku(variant.getSku())
                     .variantName((variant.getColor() != null ? variant.getColor() : "") + " " + (variant.getSize() != null ? variant.getSize() : ""))
-                    .quantity(cartItem.getQuantity())
+                    .quantity(request.getBuyNowQuantity())
                     .unitPrice(variant.getFinalPrice())
+                    .imageUrl(imageUrl)
                     .build();
             orderItem.calculateSubtotal();
             order.addItem(orderItem);
+        } else {
+            // THANH TOÁN GIỎ HÀNG
+            Cart cart = cartRepository.findByUser(user)
+                    .orElseThrow(() -> new IllegalArgumentException("Giỏ hàng trống."));
+
+            if (cart.getItems() == null || cart.getItems().isEmpty()) {
+                throw new IllegalArgumentException("Không có sản phẩm nào trong giỏ hàng.");
+            }
+
+            for (CartItem cartItem : cart.getItems()) {
+                ProductVariant variant = cartItem.getProductVariant();
+                Product product = variant.getProduct();
+                String imageUrl = null;
+                if (product != null && product.getImages() != null && !product.getImages().isEmpty()) {
+                    String imageName = product.getImages().stream()
+                            .filter(com.peaksneaker.entity.Image::getIsPrimary)
+                            .findFirst()
+                            .map(com.peaksneaker.entity.Image::getImageName)
+                            .orElse(product.getImages().get(0).getImageName());
+                    try {
+                        imageUrl = cloudinaryService.creteImageUrl(imageName);
+                    } catch (Exception ignored) {}
+                }
+
+                OrderItem orderItem = OrderItem.builder()
+                        .productVariant(variant)
+                        .productName(product != null ? product.getName() : "Sản phẩm")
+                        .sku(variant.getSku())
+                        .variantName((variant.getColor() != null ? variant.getColor() : "") + " " + (variant.getSize() != null ? variant.getSize() : ""))
+                        .quantity(cartItem.getQuantity())
+                        .unitPrice(variant.getFinalPrice())
+                        .imageUrl(imageUrl)
+                        .build();
+                orderItem.calculateSubtotal();
+                order.addItem(orderItem);
+            }
+            
+            cart.clear();
+            cartRepository.save(cart);
         }
 
         order.calculateTotals(order.getShippingFee());
 
         if (voucher != null) {
+            if (!voucher.isValidForOrder(order.getSubtotalAmount())) {
+                throw new IllegalArgumentException("Mã giảm giá không đủ điều kiện áp dụng cho đơn hàng này.");
+            }
             voucher.incrementUsage();
             voucherRepository.save(voucher);
         }
 
         Order savedOrder = orderRepository.save(order);
 
-        cart.clear();
-        cartRepository.save(cart);
-
         return savedOrder;
     }
 
 
     @Transactional(readOnly = true)
-    public PaginatedResponse<Order> getOrders(Long userId, int page, int size) {
+    public PaginatedResponse<OrderResponse> getOrders(Long userId, int page, int size) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng."));
         Page<Order> orderPage = orderRepository.findByUser(user, org.springframework.data.domain.PageRequest.of(page, size, org.springframework.data.domain.Sort.by("createdAt").descending()));
-        return com.peaksneaker.dto.response.PaginatedResponse.from(orderPage);
+        
+        List<OrderResponse> responseList = new java.util.ArrayList<>();
+        for (Order o : orderPage.getContent()) {
+            responseList.add(convertToOrderResponse(o));
+        }
+
+        Page<OrderResponse> responsePage = new org.springframework.data.domain.PageImpl<>(
+                responseList, orderPage.getPageable(), orderPage.getTotalElements()
+        );
+
+        return com.peaksneaker.dto.response.PaginatedResponse.from(responsePage);
+    }
+
+    @Transactional(readOnly = true)
+    public OrderResponse getOrderById(Long userId, Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng."));
+        if (!order.getUser().getId().equals(userId)) {
+            throw new IllegalArgumentException("Bạn không có quyền xem đơn hàng này.");
+        }
+        return convertToOrderResponse(order);
     }
 
     private OrderResponse convertToOrderResponse(Order order) {
         List<OrderItemResponse> itemResponses = new java.util.ArrayList<>();
         if (order.getItems() != null) {
             for (OrderItem item : order.getItems()) {
+                String imageUrl = null;
+                if (item.getProductVariant() != null && item.getProductVariant().getProduct() != null) {
+                    var images = item.getProductVariant().getProduct().getImages();
+                    if (images != null && !images.isEmpty()) {
+                        String imageName = images.stream()
+                                .filter(com.peaksneaker.entity.Image::getIsPrimary)
+                                .findFirst()
+                                .map(com.peaksneaker.entity.Image::getImageName)
+                                .orElse(images.get(0).getImageName());
+                        try {
+                            imageUrl = cloudinaryService.creteImageUrl(imageName);
+                        } catch (Exception ignored) {}
+                    }
+                }
+
                 itemResponses.add(OrderItemResponse.builder()
                         .id(item.getId())
+                        .productId(item.getProductVariant() != null && item.getProductVariant().getProduct() != null ? item.getProductVariant().getProduct().getId() : null)
                         .productVariantId(item.getProductVariant() != null ? item.getProductVariant().getId() : null)
                         .productName(item.getProductName())
                         .sku(item.getSku())
@@ -120,6 +210,8 @@ public class OrderService {
                         .quantity(item.getQuantity())
                         .unitPrice(item.getUnitPrice())
                         .subtotal(item.getSubtotal())
+                        .imageUrl((item.getImageUrl() != null && item.getImageUrl().startsWith("http")) ? item.getImageUrl() : 
+                                  (item.getImageUrl() != null ? cloudinaryService.creteImageUrl(item.getImageUrl()) : imageUrl))
                         .build());
             }
         }

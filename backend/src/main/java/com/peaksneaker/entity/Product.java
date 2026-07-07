@@ -31,7 +31,7 @@ public class Product {
     @JoinColumn(name = "silhouette_id")
     private Silhouette silhouette;
 
-    @Column(name = "is_featured", nullable = false)
+    @Column(name = "is_featured", nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
     private Boolean isFeatured = false;
 
@@ -48,7 +48,7 @@ public class Product {
     @Builder.Default
     private BigDecimal discountPercent = BigDecimal.ZERO;
 
-    @Column(name = "price", nullable = false, precision = 12, scale = 2)
+    @Column(name = "price", nullable = false, precision = 12, scale = 2, columnDefinition = "numeric(12,2) default 0.00")
     private BigDecimal price;
 
     @Enumerated(EnumType.STRING)
@@ -60,7 +60,7 @@ public class Product {
     @Enumerated(EnumType.STRING)
     private ProductType productType = ProductType.SNEAKER; // SNEAKER | ACCESSORY
 
-    @Column(name = "is_deleted", nullable = false)
+    @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
     private Boolean isDeleted = false;
 

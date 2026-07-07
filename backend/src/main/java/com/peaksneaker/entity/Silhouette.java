@@ -26,7 +26,7 @@ public class Silhouette {
     @JoinColumn(name = "brand_id", nullable = false)
     private Brand brand;
 
-    @Column(name = "is_deleted", nullable = false)
+    @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
     private boolean isDeleted = false;
 }

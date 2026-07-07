@@ -24,6 +24,7 @@ public class ProductDetailResponse {
     private SilhouetteResponse silhouette;
     private String gender;
     private String productType;
+    private String attributes;
     private Boolean isFeatured;
     private Boolean isNew;
     private Boolean isDeleted;
