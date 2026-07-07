@@ -11,7 +11,7 @@
  Target Server Version : 80410 (8.4.10)
  File Encoding         : 65001
 
- Date: 05/07/2026 00:50:08
+ Date: 08/07/2026 01:41:02
 */
 
 SET NAMES utf8mb4;
@@ -49,7 +49,6 @@ INSERT INTO `addresses` VALUES (4, b'0', 1, '086501452', '1778', '258', '471006'
 INSERT INTO `addresses` VALUES (5, b'0', 1, '086501452', '1778', '258', '471006', 'Thị xã La Gi', 'Bình Thuận', 'Xã Tân Bình', 'Nguyễn Thiết Hinh', 'Ấp 6');
 INSERT INTO `addresses` VALUES (6, b'0', 1, '086501452', '1778', '258', '471006', 'Thị xã La Gi', 'Bình Thuận', 'Xã Tân Bình', 'Nguyễn Thiết Hinh', 'Ấp 6');
 INSERT INTO `addresses` VALUES (7, b'0', 1, '0866501452', '1779', '258', '470704', 'Huyện Đức Linh', 'Bình Thuận', 'Xã Đông Hà', 'Hinh', 'ap 5');
-INSERT INTO `addresses` VALUES (8, b'0', 1, '0866501455', '2206', '260', '390604', 'Huyện Sông Hinh', 'Phú Yên', 'Xã Ea Bá', 'Hinh', 'ap 5');
 INSERT INTO `addresses` VALUES (9, b'1', 1, '0866501455', '2211', '260', '390507', 'Huyện Sơn Hòa', 'Phú Yên', 'Xã Sơn Hà', 'Hinh', 'ap 5');
 
 -- ----------------------------
@@ -68,11 +67,11 @@ CREATE TABLE `brands`  (
 -- ----------------------------
 -- Records of brands
 -- ----------------------------
-INSERT INTO `brands` VALUES (1, 'Nike', 'Những thiết kế kinh điển kết hợp với sự đổi mới không ngừng, mang đến phong cách thể thao hiện đại và đẳng cấp.', 'Logo_NIKE.svg', b'0');
-INSERT INTO `brands` VALUES (2, 'Adidas', 'Sự giao thoa hoàn hảo giữa thể thao chuyên nghiệp và thời trang đường phố.', 'Adidas_Logo.svg', b'0');
-INSERT INTO `brands` VALUES (3, 'Vans', 'Phong cách streetwear và skateboarding trẻ trung, cá tính.', 'Vans_Logo.svg', b'0');
-INSERT INTO `brands` VALUES (4, 'Converse', 'Biểu tượng thời trang thể thao cổ điển với thiết kế canvas vượt thời gian.', 'Converse_Logo.svg', b'0');
-INSERT INTO `brands` VALUES (5, 'Puma', 'Sự kết hợp giữa công nghệ thể thao và phong cách hiện đại, mạnh mẽ.', 'Puma_Logo.svg', b'0');
+INSERT INTO `brands` VALUES (1, 'Nike', 'Những thiết kế kinh điển kết hợp với sự đổi mới không ngừng, mang đến phong cách thể thao hiện đại và đẳng cấp.', 'nike.jpg', b'0');
+INSERT INTO `brands` VALUES (2, 'Adidas', 'Sự giao thoa hoàn hảo giữa thể thao chuyên nghiệp và thời trang đường phố.', 'adidas.jpg', b'0');
+INSERT INTO `brands` VALUES (3, 'Vans', 'Phong cách streetwear và skateboarding trẻ trung, cá tính.', 'vans.jpg', b'0');
+INSERT INTO `brands` VALUES (4, 'Converse', 'Biểu tượng thời trang thể thao cổ điển với thiết kế canvas vượt thời gian.', 'converse.jpg', b'0');
+INSERT INTO `brands` VALUES (5, 'Puma', 'Sự kết hợp giữa công nghệ thể thao và phong cách hiện đại, mạnh mẽ.', 'puma.jpg', b'0');
 
 -- ----------------------------
 -- Table structure for cart_items
@@ -147,7 +146,7 @@ CREATE TABLE `images`  (
   INDEX `FKq4m09wgn47ymx4wgldqt24mes`(`product_variant_id` ASC) USING BTREE,
   CONSTRAINT `FKghwsjbjo7mg3iufxruvq6iu3q` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `FKq4m09wgn47ymx4wgldqt24mes` FOREIGN KEY (`product_variant_id`) REFERENCES `product_variants` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 32 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 33 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of images
@@ -182,7 +181,7 @@ INSERT INTO `images` VALUES (27, 'suede_red_white.jpg', b'0', 9, 27);
 INSERT INTO `images` VALUES (28, 'rsx_multicolor.jpg', b'1', 10, 28);
 INSERT INTO `images` VALUES (29, 'rsx_multicolor.jpg', b'0', 10, 29);
 INSERT INTO `images` VALUES (30, 'rsx_black_red.jpg', b'0', 10, 30);
-INSERT INTO `images` VALUES (31, 'icon_splash.jpg', b'1', 11, NULL);
+INSERT INTO `images` VALUES (32, 'Tat-Nike-Sportswear-Dri-FIT.jpg', b'1', 12, NULL);
 
 -- ----------------------------
 -- Table structure for inventory_transactions
@@ -198,13 +197,13 @@ CREATE TABLE `inventory_transactions`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `FKw2ymau4bkb32bmypse7kgw70`(`variant_id` ASC) USING BTREE,
   CONSTRAINT `FKw2ymau4bkb32bmypse7kgw70` FOREIGN KEY (`variant_id`) REFERENCES `product_variants` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 4 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of inventory_transactions
 -- ----------------------------
 INSERT INTO `inventory_transactions` VALUES (1, '2026-07-03 10:33:48.544482', 'thêm đơn hàng tháng 7', 4, 'IMPORT', 4);
-INSERT INTO `inventory_transactions` VALUES (2, '2026-07-03 11:02:08.366658', 'thêm đơn hàng tháng 7', 1, 'IMPORT', 34);
+INSERT INTO `inventory_transactions` VALUES (3, '2026-07-07 18:09:27.907448', 'Nhập tất', 5, 'IMPORT', 35);
 
 -- ----------------------------
 -- Table structure for order_items
@@ -220,6 +219,7 @@ CREATE TABLE `order_items`  (
   `quantity` int NOT NULL,
   `unit_price` decimal(12, 2) NOT NULL,
   `subtotal` decimal(12, 2) NOT NULL,
+  `image_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `FK_oi_order`(`order_id` ASC) USING BTREE,
   INDEX `FKltmtlue0wixrg1cf0xo7x0l4d`(`product_variant_id` ASC) USING BTREE,
@@ -230,8 +230,8 @@ CREATE TABLE `order_items`  (
 -- ----------------------------
 -- Records of order_items
 -- ----------------------------
-INSERT INTO `order_items` VALUES (1, 1, 11, 'Adidas Ultraboost Light', 'Core Black 38', 'P4-CB-38', 1, 5000000.00, 5000000.00);
-INSERT INTO `order_items` VALUES (2, 2, 4, 'Nike Air Zoom Pegasus 40', 'Black/White 42', 'P2-BW-42', 1, 3500000.00, 3500000.00);
+INSERT INTO `order_items` VALUES (1, 1, 11, 'Adidas Ultraboost Light', 'Core Black 38', 'P4-CB-38', 1, 5000000.00, 5000000.00, NULL);
+INSERT INTO `order_items` VALUES (2, 2, 4, 'Nike Air Zoom Pegasus 40', 'Black/White 42', 'P2-BW-42', 1, 3500000.00, 3500000.00, NULL);
 
 -- ----------------------------
 -- Table structure for orders
@@ -309,7 +309,7 @@ CREATE TABLE `product_variants`  (
   UNIQUE INDEX `UK_variant_sku`(`sku` ASC) USING BTREE,
   INDEX `FK_variant_product`(`product_id` ASC) USING BTREE,
   CONSTRAINT `FK_variant_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 35 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 36 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of product_variants
@@ -344,7 +344,7 @@ INSERT INTO `product_variants` VALUES (27, 9, 'P9-RW-42', 'Đỏ/Trắng', '42',
 INSERT INTO `product_variants` VALUES (28, 10, 'P10-MC-40', 'Đa màu', '40', 35, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
 INSERT INTO `product_variants` VALUES (29, 10, 'P10-MC-41', 'Đa màu', '41', 40, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
 INSERT INTO `product_variants` VALUES (30, 10, 'P10-BR-41', 'Đen/Đỏ', '41', 20, 0.00, '2026-06-25 02:33:58.000000', '2026-06-25 02:33:58.000000');
-INSERT INTO `product_variants` VALUES (34, 11, 'NIKE-AIR-0001', 'Đen', '42', 1, 0.00, '2026-07-03 11:01:38.272714', '2026-07-03 11:02:08.379845');
+INSERT INTO `product_variants` VALUES (35, 12, 'ADD-SOCK-HIGH-BLACK', 'Đen', '10', 5, 0.00, '2026-07-07 18:09:15.208003', '2026-07-07 18:09:27.921162');
 
 -- ----------------------------
 -- Table structure for products
@@ -370,7 +370,7 @@ CREATE TABLE `products`  (
   INDEX `FK_p_sil`(`silhouette_id` ASC) USING BTREE,
   CONSTRAINT `FK_p_cat` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `FK_p_sil` FOREIGN KEY (`silhouette_id`) REFERENCES `silhouettes` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 12 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 13 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of products
@@ -385,7 +385,7 @@ INSERT INTO `products` VALUES (7, 'Converse Chuck Taylor All Star', 'Giày cổ 
 INSERT INTO `products` VALUES (8, 'Converse Run Star Hike', 'Giày đế độn phong cách cá tính.', '{\"phong_cách\": \"Phong cách đế dày thời trang, tạo điểm nhấn nổi bật và cá tính\", \"chất_liệu\": \"Vải canvas chất lượng cao, mang lại cảm giác thoải mái khi sử dụng\"}', 'WOMEN', 'SNEAKER', 2800000.00, 0.10, 2520000.00, 1, 8, b'0', b'0', '2026-06-25 02:30:36.000000');
 INSERT INTO `products` VALUES (9, 'Puma Suede Classic', 'Giày da lộn phong cách retro.', '{\"phong_cách\": \"Phong cách thường ngày thanh lịch, phù hợp cho nhiều dịp khác nhau\", \"chất_liệu\": \"Da lộn mềm mại với bề mặt sang trọng và tinh tế\"}', 'MEN', 'SNEAKER', 2200000.00, 0.00, 2200000.00, 1, 9, b'0', b'0', '2026-06-25 02:30:36.000000');
 INSERT INTO `products` VALUES (10, 'Puma RS-X Toys', 'Giày sneaker phom dáng chunky hầm hố.', '{\"phong_cách\": \"Phong cách đế dày hiện đại, mang lại vẻ ngoài nổi bật và thời thượng\", \"chất_liệu\": \"Kết hợp giữa vải lưới thoáng khí và da bền chắc, tăng độ ổn định khi mang\"}', 'UNISEX', 'SNEAKER', 3000000.00, 0.30, 2100000.00, 1, 10, b'1', b'0', '2026-06-25 02:30:36.000000');
-INSERT INTO `products` VALUES (11, 'Nike air hinh', 'Chất liệu thoáng mát', NULL, 'UNISEX', 'SNEAKER', 10000000.00, 10.00, 9000000.00, 1, 1, b'0', b'0', '2026-07-03 10:43:20.159137');
+INSERT INTO `products` VALUES (12, 'Tất Nike Sportswear Dri-FIT', 'Tất Nike Sportswear Dri-FIT là một lựa chọn tuyệt vời cho những ai tìm kiếm sự thoải mái và hiệu suất trong việc luyện tập thể thao hoặc sử dụng hàng ngày. ', NULL, 'UNISEX', 'ACCESSORY', 490000.00, 0.00, 490000.00, 3, 11, b'0', b'0', '2026-07-07 18:08:16.201814');
 
 -- ----------------------------
 -- Table structure for reviews
@@ -399,6 +399,7 @@ CREATE TABLE `reviews`  (
   `comment` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
   `created_at` datetime(6) NULL DEFAULT NULL,
   `is_deleted` bit(1) NULL DEFAULT NULL,
+  `is_edited` bit(1) NULL DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `FKpl51cejpw4gy5swfar8br9ngi`(`product_id` ASC) USING BTREE,
   INDEX `FKcgy7qjc1r99dp117y9en6lxye`(`user_id` ASC) USING BTREE,
@@ -423,21 +424,22 @@ CREATE TABLE `silhouettes`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `FK_sil_brand`(`brand_id` ASC) USING BTREE,
   CONSTRAINT `FK_sil_brand` FOREIGN KEY (`brand_id`) REFERENCES `brands` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 11 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 12 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of silhouettes
 -- ----------------------------
-INSERT INTO `silhouettes` VALUES (1, 'Air Force 1', 'https://images.unsplash.com/photo-1605340537586-0a5a228fdd64?auto=format&fit=crop&q=80&w=300', 1, b'0');
-INSERT INTO `silhouettes` VALUES (2, 'Air Zoom Pegasus 40', 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&q=80&w=300', 1, b'0');
-INSERT INTO `silhouettes` VALUES (3, 'Stan Smith', NULL, 2, b'0');
-INSERT INTO `silhouettes` VALUES (4, 'Ultraboost Light', NULL, 2, b'0');
-INSERT INTO `silhouettes` VALUES (5, 'Vans Old Skool', NULL, 3, b'0');
-INSERT INTO `silhouettes` VALUES (6, 'Vans Slip-On Checkerboard', NULL, 3, b'0');
-INSERT INTO `silhouettes` VALUES (7, 'Converse Chuck Taylor All Star', NULL, 4, b'0');
-INSERT INTO `silhouettes` VALUES (8, 'Converse Run Star Hike', NULL, 4, b'0');
-INSERT INTO `silhouettes` VALUES (9, 'Puma Suede Classic', NULL, 5, b'0');
-INSERT INTO `silhouettes` VALUES (10, 'Puma RS-X Toys', NULL, 5, b'0');
+INSERT INTO `silhouettes` VALUES (1, 'Air Force 1', 'air-force-1.jpeg', 1, b'0');
+INSERT INTO `silhouettes` VALUES (2, 'Air Zoom Pegasus 40', 'air-zoom-pegasus.jpeg', 1, b'0');
+INSERT INTO `silhouettes` VALUES (3, 'Stan Smith', 'stan-smith.webp', 2, b'0');
+INSERT INTO `silhouettes` VALUES (4, 'Ultraboost Light', 'ultraboost-light.webp', 2, b'0');
+INSERT INTO `silhouettes` VALUES (5, 'Vans Old Skool', 'vans-old-skool.jpg', 3, b'0');
+INSERT INTO `silhouettes` VALUES (6, 'Vans Slip-On Checkerboard', 'converse-run-star-hike.webp', 3, b'0');
+INSERT INTO `silhouettes` VALUES (7, 'Converse Chuck Taylor All Star', 'converse-chuck-taylor-all-star.jpg', 4, b'0');
+INSERT INTO `silhouettes` VALUES (8, 'Converse Run Star Hike', 'converse-run-star-hike.webp', 4, b'0');
+INSERT INTO `silhouettes` VALUES (9, 'Puma Suede Classic', 'puma-suede-classic.webp', 5, b'0');
+INSERT INTO `silhouettes` VALUES (10, 'Puma RS-X Toys', 'puma-rs-x-toys.jpeg', 5, b'0');
+INSERT INTO `silhouettes` VALUES (11, 'Adidas Socks', 'adidas-socks.jpg', 2, b'0');
 
 -- ----------------------------
 -- Table structure for user_vouchers
@@ -478,6 +480,7 @@ CREATE TABLE `users`  (
   `is_active` bit(1) NOT NULL,
   `is_verified` bit(1) NOT NULL,
   `created_at` datetime(6) NOT NULL,
+  `has_password` tinyint(1) NULL DEFAULT 1,
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `UK_user_email`(`email` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;
@@ -485,7 +488,7 @@ CREATE TABLE `users`  (
 -- ----------------------------
 -- Records of users
 -- ----------------------------
-INSERT INTO `users` VALUES (1, 'thiethinh789@gmail.com', '0866501452', 'Hinh', 'Thiết', '$2a$10$t4jO/WZSlutujGnY0AMw2uxaQ4xeDTFpKwzJkvwQfy5kdkB.J294q', 'ADMIN', b'1', b'0', '2026-07-01 20:44:45.320539');
+INSERT INTO `users` VALUES (1, 'thiethinh789@gmail.com', '0866501452', 'Hinh', 'Thiết', '$2a$10$t4jO/WZSlutujGnY0AMw2uxaQ4xeDTFpKwzJkvwQfy5kdkB.J294q', 'ADMIN', b'1', b'0', '2026-07-01 20:44:45.320539', 1);
 
 -- ----------------------------
 -- Table structure for vouchers
