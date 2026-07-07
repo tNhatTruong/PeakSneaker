@@ -10,7 +10,8 @@ import {
   Search,
   Bell,
   LogOut,
-  Menu
+  Menu,
+  FolderTree
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
@@ -31,6 +32,7 @@ export default function AdminLayout() {
   const navItems = [
     { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
     { name: "Đơn hàng", path: "/admin/orders", icon: Package },
+    { name: "Danh mục", path: "/admin/categories", icon: FolderTree },
     { name: "Sản phẩm", path: "/admin/products", icon: ShoppingBag },
     { name: "Kho & Biến thể", path: "/admin/inventory", icon: Layers },
     { name: "Thương hiệu", path: "/admin/brands", icon: Tags },
