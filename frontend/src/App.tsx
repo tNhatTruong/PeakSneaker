@@ -5,6 +5,7 @@ import HomePage from "./pages/customer/HomePage";
 import ShopPage from "./pages/customer/ShopPage";
 import CheckoutPage from "./pages/customer/CheckoutPage";
 import OrderHistoryPage from "./pages/customer/OrderHistoryPage";
+import OrderDetailPage from "./pages/customer/OrderDetailPage";
 import BrandsPage from "./pages/customer/BrandsPage";
 
 // Hinh's Customer Imports
@@ -15,6 +16,7 @@ import ProfilePage from "./pages/customer/ProfilePage";
 import ProductDetailPage from "./pages/customer/ProductDetailPage";
 import VouchersPage from "./pages/customer/VouchersPage";
 import { VnpayReturnPage } from "./pages/customer/VnpayReturnPage";
+import { OrderSuccessPage } from "./pages/customer/OrderSuccessPage";
 
 // Admin Imports
 import AdminLayout from "./components/admin/AdminLayout";
@@ -25,6 +27,7 @@ import AdminBrandsPage from "./pages/admin/AdminBrandsPage";
 import AdminProductsPage from "./pages/admin/AdminProductsPage";
 import AdminInventoryPage from "./pages/admin/AdminInventoryPage";
 import AdminVouchersPage from "./pages/admin/AdminVouchersPage";
+import AdminCategoriesPage from "./pages/admin/AdminCategoriesPage";
 
 import ScrollToTop from "./components/common/ScrollToTop";
 
@@ -40,6 +43,7 @@ function App() {
           <Route path="products/:id" element={<ProductDetailPage />} />
           <Route path="checkout" element={<CheckoutPage />} />
           <Route path="orders" element={<OrderHistoryPage />} />
+          <Route path="orders/:id" element={<OrderDetailPage />} />
           <Route path="brands" element={<BrandsPage />} />
           <Route path="login" element={<LoginPage />} />
           <Route path="register" element={<RegisterPage />} />
@@ -47,6 +51,7 @@ function App() {
           <Route path="profile" element={<ProfilePage />} />
           <Route path="vouchers" element={<VouchersPage />} />
           <Route path="vnpay-return" element={<VnpayReturnPage />} />
+          <Route path="order-success" element={<OrderSuccessPage />} />
         </Route>
 
         {/* Các trang dành cho Admin */}
@@ -54,6 +59,7 @@ function App() {
           <Route path="dashboard" element={<AdminDashboardPage />} />
           <Route path="orders" element={<AdminOrdersPage />} />
           <Route path="customers" element={<AdminCustomersPage />} />
+          <Route path="categories" element={<AdminCategoriesPage />} />
           <Route path="brands" element={<AdminBrandsPage />} />
           <Route path="products" element={<AdminProductsPage />} />
           <Route path="inventory" element={<AdminInventoryPage />} />
