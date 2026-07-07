@@ -14,6 +14,9 @@ public class CategoryResponse {
     private Long id;
     private String name;
     private String slug;
+    private String description;
+    private Long parentId;
+    private String parentName;
 
     public static CategoryResponse fromEntity(Category category) {
         if (category == null) return null;
@@ -21,6 +24,9 @@ public class CategoryResponse {
                 .id(category.getId())
                 .name(category.getName())
                 .slug(category.getSlug())
+                .description(category.getDescription())
+                .parentId(category.getParent() != null ? category.getParent().getId() : null)
+                .parentName(category.getParent() != null ? category.getParent().getName() : null)
                 .build();
     }
 }
