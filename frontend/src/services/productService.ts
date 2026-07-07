@@ -58,6 +58,7 @@ export interface ProductDetailResponse {
   silhouette: SilhouetteResponse | null;
   gender?: string;
   productType?: string;
+  attributes?: string;
   isFeatured: boolean;
   isNew: boolean;
   isDeleted?: boolean;

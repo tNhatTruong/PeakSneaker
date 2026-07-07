@@ -116,6 +116,14 @@ export default function ShopPage() {
     setSearchParams(newParams);
   };
 
+  const getSortLabel = () => {
+    if (sortBy === "createdAt" && sortDirection === "desc") return "Mới nhất";
+    if (sortBy === "isFeatured" && sortDirection === "desc") return "Bán chạy nhất";
+    if (sortBy === "basePrice" && sortDirection === "asc") return "Giá tăng dần";
+    if (sortBy === "basePrice" && sortDirection === "desc") return "Giá giảm dần";
+    return "Sắp xếp";
+  };
+
   return (
     <div className="container mx-auto px-4 md:px-8 py-10">
       {/* Page Header & Top Bar */}
@@ -143,15 +151,16 @@ export default function ShopPage() {
           </form>
           
           <div className="relative group">
-            <button className="flex items-center space-x-2 border border-zinc-200 px-4 py-2 text-sm font-medium bg-white">
-              <span>Sắp xếp</span>
+            <button className="flex items-center space-x-2 border border-zinc-200 px-4 py-2 text-sm font-medium bg-white min-w-[140px] justify-between">
+              <span>{getSortLabel()}</span>
               <ChevronDown className="h-4 w-4" />
             </button>
             <div className="absolute right-0 mt-2 w-48 bg-white border border-zinc-200 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
               <ul className="py-2">
-                <li onClick={() => handleSort("createdAt", "desc")} className="px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100 cursor-pointer">Mới nhất</li>
-                <li onClick={() => handleSort("basePrice", "asc")} className="px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100 cursor-pointer">Giá tăng dần</li>
-                <li onClick={() => handleSort("basePrice", "desc")} className="px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100 cursor-pointer">Giá giảm dần</li>
+                <li onClick={() => handleSort("createdAt", "desc")} className={`px-4 py-2 text-sm cursor-pointer ${sortBy === "createdAt" ? "text-zinc-900 font-bold bg-zinc-50" : "text-zinc-700 hover:bg-zinc-100"}`}>Mới nhất</li>
+                <li onClick={() => handleSort("isFeatured", "desc")} className={`px-4 py-2 text-sm cursor-pointer ${sortBy === "isFeatured" ? "text-zinc-900 font-bold bg-zinc-50" : "text-zinc-700 hover:bg-zinc-100"}`}>Bán chạy nhất</li>
+                <li onClick={() => handleSort("basePrice", "asc")} className={`px-4 py-2 text-sm cursor-pointer ${sortBy === "basePrice" && sortDirection === "asc" ? "text-zinc-900 font-bold bg-zinc-50" : "text-zinc-700 hover:bg-zinc-100"}`}>Giá tăng dần</li>
+                <li onClick={() => handleSort("basePrice", "desc")} className={`px-4 py-2 text-sm cursor-pointer ${sortBy === "basePrice" && sortDirection === "desc" ? "text-zinc-900 font-bold bg-zinc-50" : "text-zinc-700 hover:bg-zinc-100"}`}>Giá giảm dần</li>
               </ul>
             </div>
           </div>

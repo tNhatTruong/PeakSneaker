@@ -1,23 +1,38 @@
-import { Star, Truck, ShieldCheck, Ruler, Loader2 } from "lucide-react";
+import { Star, Truck, ShieldCheck, Ruler, Loader2, X } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ProductService } from "../../services/productService";
-import type { ProductDetailResponse } from "../../services/productService";
+import { ProductService, type ProductDetailResponse } from "../../services/productService";
+import { ReviewService, type ReviewStatsResponse } from "../../services/reviewService";
 import { useCart } from "../../context/CartContext";
 import toast from "react-hot-toast";
+import ReviewList from "../../components/customer/ReviewList";
+import sizeGuideImg from "../../assets/images/Size-guide.jpg";
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { cart, addToCart } = useCart();
+  const { addToCart } = useCart();
   
   const [product, setProduct] = useState<ProductDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [addingToCart, setAddingToCart] = useState(false);
+  const [reviewStats, setReviewStats] = useState<ReviewStatsResponse | null>(null);
 
   const [selectedColor, setSelectedColor] = useState<string>("");
   const [selectedSize, setSelectedSize] = useState<string>("");
+  const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
+  const [selectedImageId, setSelectedImageId] = useState<number | null>(null);
+
+  const parsedAttributes = useMemo(() => {
+    if (!product?.attributes) return null;
+    try {
+      return JSON.parse(product.attributes) as Record<string, string>;
+    } catch (e) {
+      console.error("Failed to parse attributes", e);
+      return null;
+    }
+  }, [product?.attributes]);
 
   useEffect(() => {
     if (!id) return;
@@ -34,6 +49,15 @@ export default function ProductDetailPage() {
           setSelectedColor(firstVariant.color);
           setSelectedSize(firstVariant.size);
         }
+        
+        try {
+          const statsRes = await ReviewService.getProductReviewStats(Number(id));
+          // @ts-ignore
+          if (statsRes?.data) setReviewStats(statsRes.data);
+        } catch (e) {
+          console.error("Failed to fetch review stats", e);
+        }
+
       } catch (err: any) {
         setError(err.response?.data?.message || "Không thể tải thông tin sản phẩm.");
       } finally {
@@ -98,36 +122,29 @@ export default function ProductDetailPage() {
     }
   };
 
-  const handleBuyNow = async () => {
+  const handleBuyNow = () => {
     if (!currentVariant) return;
     if (currentVariant.stock <= 0) {
       toast.error("Sản phẩm này đã hết hàng!");
       return;
     }
 
-    try {
-      setAddingToCart(true);
-      
-      // Kiểm tra xem sản phẩm (variant) đã có trong giỏ hàng chưa
-      const isAlreadyInCart = cart?.items.some(item => item.variantId === currentVariant.id);
-      
-      // Nếu chưa có thì mới thêm vào giỏ
-      if (!isAlreadyInCart) {
-        await addToCart(currentVariant.id, 1);
+    // Chuyển thẳng sang trang checkout kèm theo thông tin mua ngay
+    navigate("/checkout", {
+      state: {
+        buyNowVariantId: currentVariant.id,
+        buyNowQuantity: 1,
+        buyNowItem: {
+          id: currentVariant.id, // Dùng làm key
+          productName: product.name,
+          productThumbnail: product.images.find(img => img.isPrimary)?.imageUrl || product.images[0]?.imageUrl || "",
+          size: currentVariant.size,
+          color: currentVariant.color,
+          price: currentVariant.finalPrice,
+          quantity: 1
+        }
       }
-      
-      // Sau đó chuyển thẳng sang checkout
-      navigate("/checkout");
-    } catch (err: any) {
-      if (err.response?.status === 401 || err.response?.status === 403) {
-        toast.error("Vui lòng đăng nhập để mua hàng.");
-        navigate("/login");
-      } else {
-        toast.error(err.response?.data?.message || "Đã xảy ra lỗi khi mua hàng.");
-      }
-    } finally {
-      setAddingToCart(false);
-    }
+    });
   };
 
   if (loading) {
@@ -149,7 +166,10 @@ export default function ProductDetailPage() {
     );
   }
 
-  const primaryImage = product.images.find(img => img.isPrimary)?.imageUrl || product.images[0]?.imageUrl || "https://placehold.co/800x800?text=No+Image";
+  const defaultImage = product.images.find(img => img.isPrimary) || product.images[0];
+  const activeImage = product.images.find(img => img.id === selectedImageId) || defaultImage;
+  const displayImage = activeImage?.imageUrl || "https://placehold.co/800x800?text=No+Image";
+  const displayImageId = activeImage?.id;
   const displayPrice = currentVariant ? currentVariant.finalPrice : product.basePrice;
 
   return (
@@ -161,7 +181,13 @@ export default function ProductDetailPage() {
           {/* Thumbnails */}
           <div className="flex lg:flex-col gap-3 overflow-x-auto lg:overflow-visible scrollbar-hide">
             {product.images.map((img) => (
-              <button key={img.id} className="w-20 h-20 flex-shrink-0 bg-zinc-100 rounded-md border-2 border-transparent hover:border-black focus:border-black overflow-hidden transition-all">
+              <button 
+                key={img.id} 
+                onClick={() => setSelectedImageId(img.id)}
+                className={`w-20 h-20 flex-shrink-0 bg-zinc-100 rounded-md border-2 overflow-hidden transition-all ${
+                  displayImageId === img.id ? 'border-black' : 'border-transparent hover:border-black focus:border-black'
+                }`}
+              >
                 <img src={img.imageUrl} alt="" className="w-full h-full object-cover mix-blend-multiply" />
               </button>
             ))}
@@ -178,13 +204,13 @@ export default function ProductDetailPage() {
                  Mới
                </div>
              )}
-             <img src={primaryImage} alt={product.name} className="w-full max-h-full object-contain mix-blend-multiply hover:scale-105 transition-transform duration-500" />
+             <img src={displayImage} alt={product.name} className="w-full max-h-full object-contain mix-blend-multiply hover:scale-105 transition-transform duration-500" />
           </div>
         </div>
 
         {/* Product Info */}
         <div className="mt-10 lg:mt-0">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
             {product.brand && (
               <span className="text-sm font-bold text-zinc-500 tracking-widest uppercase">{product.brand.name}</span>
             )}
@@ -194,23 +220,50 @@ export default function ProductDetailPage() {
                 <span className="text-sm font-medium text-zinc-500">{product.silhouette.name}</span>
               </>
             )}
+            {product.gender && (
+              <>
+                <span className="text-zinc-300">•</span>
+                <span className="text-sm font-medium text-zinc-500">{product.gender}</span>
+              </>
+            )}
+            {product.productType && (
+              <>
+                <span className="text-zinc-300">•</span>
+                <span className="text-sm font-medium text-zinc-500">{product.productType}</span>
+              </>
+            )}
           </div>
           <h1 className="text-3xl sm:text-4xl font-black text-zinc-900 tracking-tight uppercase">{product.name}</h1>
           
-          <div className="mt-4 flex items-center gap-4">
-            <p className="text-2xl font-bold text-zinc-900">
-              {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(displayPrice)}
-            </p>
-            <div className="flex items-center text-sm">
-              <div className="flex text-yellow-400">
-                <Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" />
+          <div className="mt-4 flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-3">
+              <p className="text-2xl font-bold text-zinc-900">
+                {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(displayPrice)}
+              </p>
+              {product.discountPercent && product.discountPercent > 0 ? (
+                <>
+                  <p className="text-lg font-medium text-zinc-400 line-through">
+                    {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(product.basePrice)}
+                  </p>
+                  <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-md">
+                    -{product.discountPercent}%
+                  </span>
+                </>
+              ) : null}
+            </div>
+            <div className="flex items-center text-sm sm:border-l sm:border-zinc-200 sm:pl-4 sm:ml-2">
+              <div className="flex items-center gap-1 cursor-pointer" onClick={() => {
+                document.getElementById('reviews-section')?.scrollIntoView({ behavior: 'smooth' });
+              }}>
+                <span className="font-bold text-yellow-500 mr-1">{reviewStats?.averageRating > 0 ? reviewStats.averageRating.toFixed(1) : "0"}</span>
+                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                <span className="ml-2 text-zinc-500 underline hover:text-black">{reviewStats?.totalReviews || 0} Đánh giá</span>
               </div>
-              <span className="ml-2 text-zinc-500 underline cursor-pointer hover:text-black">124 Đánh giá</span>
             </div>
           </div>
 
           <div className="mt-6 space-y-6">
-            <p className="text-zinc-600 leading-relaxed">
+            <p className="text-zinc-600 leading-relaxed text-base whitespace-pre-wrap">
               {product.description || "Chưa có mô tả cho sản phẩm này."}
             </p>
 
@@ -241,7 +294,10 @@ export default function ProductDetailPage() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium text-zinc-900">Kích thước (EU)</h3>
-                  <button className="text-sm text-zinc-500 flex items-center hover:text-black underline">
+                  <button 
+                    onClick={() => setIsSizeGuideOpen(true)}
+                    className="text-sm text-zinc-500 flex items-center hover:text-black underline"
+                  >
                     <Ruler className="w-4 h-4 mr-1"/> Hướng dẫn chọn size
                   </button>
                 </div>
@@ -315,6 +371,54 @@ export default function ProductDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Product Attributes Section */}
+      {parsedAttributes && Object.keys(parsedAttributes).length > 0 && (
+        <div className="mt-20 border-t border-zinc-100 pt-16">
+          <h2 className="text-2xl font-black text-zinc-900 uppercase tracking-wide mb-8">Đặc điểm nổi bật</h2>
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-zinc-50 p-6 rounded-xl border border-zinc-100">
+              <ul className="space-y-3">
+                {Object.entries(parsedAttributes).map(([key, value]) => (
+                  <li key={key} className="flex flex-col sm:flex-row sm:items-start text-base border-b border-zinc-200/60 pb-3 last:border-0 last:pb-0">
+                    <span className="font-semibold text-zinc-800 sm:w-1/3 capitalize">{key.replace(/_/g, ' ')}</span>
+                    <span className="text-zinc-600 sm:w-2/3">{value}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Product Reviews Section */}
+      <div id="reviews-section" className="mt-16 border-t border-zinc-100 pt-16">
+        <h2 className="text-2xl font-black text-zinc-900 uppercase tracking-wide mb-8">Đánh giá sản phẩm</h2>
+        <div className="max-w-4xl mx-auto">
+            <ReviewList productId={product.id} />
+        </div>
+      </div>
+
+      {/* Size Guide Modal */}
+      {isSizeGuideOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col relative">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-xl font-bold">Hướng dẫn chọn size</h3>
+              <button 
+                onClick={() => setIsSizeGuideOpen(false)}
+                className="p-2 hover:bg-zinc-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto flex justify-center">
+              <img src={sizeGuideImg} alt="Size Guide" className="max-w-full h-auto object-contain" />
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
