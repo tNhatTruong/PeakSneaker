@@ -34,4 +34,21 @@ public class AddressController {
         List<AddressResponse> responses = addressService.getUserAddresses(userDetails.getId());
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách địa chỉ thành công", responses));
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<AddressResponse>> updateAddress(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @PathVariable Long id,
+            @Valid @RequestBody AddressRequest request) {
+        AddressResponse response = addressService.updateAddress(userDetails.getId(), id, request);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật địa chỉ thành công", response));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteAddress(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @PathVariable Long id) {
+        addressService.deleteAddress(userDetails.getId(), id);
+        return ResponseEntity.ok(ApiResponse.success("Xóa địa chỉ thành công", null));
+    }
 }
