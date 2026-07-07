@@ -94,7 +94,7 @@ public class BrandService {
                     .map(s -> com.peaksneaker.dto.response.SilhouetteResponse.builder()
                             .id(s.getId())
                             .name(s.getName())
-                            .imageUrl(s.getImageUrl())
+                            .imageUrl(cloudService.creteImageUrl(s.getImageUrl()))
                             .build())
                     .collect(Collectors.toList());
         }
@@ -102,7 +102,7 @@ public class BrandService {
         return BrandResponse.builder()
                 .id(brand.getId())
                 .name(brand.getName())
-                .logoUrl(brand.getLogoUrl())
+                .logoUrl(cloudService.creteImageUrl(brand.getLogoUrl()))
                 .description(brand.getDescription())
                 .silhouettes(silhouetteResponses)
                 .build();
