@@ -68,11 +68,11 @@ CREATE TABLE `brands`  (
 -- ----------------------------
 -- Records of brands
 -- ----------------------------
-INSERT INTO `brands` VALUES (1, 'Nike', 'Những thiết kế kinh điển kết hợp với sự đổi mới không ngừng, mang đến phong cách thể thao hiện đại và đẳng cấp.', 'Logo_NIKE.svg', b'0');
-INSERT INTO `brands` VALUES (2, 'Adidas', 'Sự giao thoa hoàn hảo giữa thể thao chuyên nghiệp và thời trang đường phố.', 'Adidas_Logo.svg', b'0');
-INSERT INTO `brands` VALUES (3, 'Vans', 'Phong cách streetwear và skateboarding trẻ trung, cá tính.', 'Vans_Logo.svg', b'0');
-INSERT INTO `brands` VALUES (4, 'Converse', 'Biểu tượng thời trang thể thao cổ điển với thiết kế canvas vượt thời gian.', 'Converse_Logo.svg', b'0');
-INSERT INTO `brands` VALUES (5, 'Puma', 'Sự kết hợp giữa công nghệ thể thao và phong cách hiện đại, mạnh mẽ.', 'Puma_Logo.svg', b'0');
+INSERT INTO `brands` VALUES (1, 'Nike', 'Những thiết kế kinh điển kết hợp với sự đổi mới không ngừng, mang đến phong cách thể thao hiện đại và đẳng cấp.', 'nike.jpg', b'0');
+INSERT INTO `brands` VALUES (2, 'Adidas', 'Sự giao thoa hoàn hảo giữa thể thao chuyên nghiệp và thời trang đường phố.', 'adidas.jpg', b'0');
+INSERT INTO `brands` VALUES (3, 'Vans', 'Phong cách streetwear và skateboarding trẻ trung, cá tính.', 'vans.jpg', b'0');
+INSERT INTO `brands` VALUES (4, 'Converse', 'Biểu tượng thời trang thể thao cổ điển với thiết kế canvas vượt thời gian.', 'converse.jpg', b'0');
+INSERT INTO `brands` VALUES (5, 'Puma', 'Sự kết hợp giữa công nghệ thể thao và phong cách hiện đại, mạnh mẽ.', 'puma.jpg', b'0');
 
 -- ----------------------------
 -- Table structure for cart_items
@@ -428,16 +428,16 @@ CREATE TABLE `silhouettes`  (
 -- ----------------------------
 -- Records of silhouettes
 -- ----------------------------
-INSERT INTO `silhouettes` VALUES (1, 'Air Force 1', 'https://images.unsplash.com/photo-1605340537586-0a5a228fdd64?auto=format&fit=crop&q=80&w=300', 1, b'0');
-INSERT INTO `silhouettes` VALUES (2, 'Air Zoom Pegasus 40', 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&q=80&w=300', 1, b'0');
-INSERT INTO `silhouettes` VALUES (3, 'Stan Smith', NULL, 2, b'0');
-INSERT INTO `silhouettes` VALUES (4, 'Ultraboost Light', NULL, 2, b'0');
-INSERT INTO `silhouettes` VALUES (5, 'Vans Old Skool', NULL, 3, b'0');
-INSERT INTO `silhouettes` VALUES (6, 'Vans Slip-On Checkerboard', NULL, 3, b'0');
-INSERT INTO `silhouettes` VALUES (7, 'Converse Chuck Taylor All Star', NULL, 4, b'0');
-INSERT INTO `silhouettes` VALUES (8, 'Converse Run Star Hike', NULL, 4, b'0');
-INSERT INTO `silhouettes` VALUES (9, 'Puma Suede Classic', NULL, 5, b'0');
-INSERT INTO `silhouettes` VALUES (10, 'Puma RS-X Toys', NULL, 5, b'0');
+INSERT INTO `silhouettes` VALUES (1, 'Air Force 1', 'air-force-1.jpeg', 1, b'0');
+INSERT INTO `silhouettes` VALUES (2, 'Air Zoom Pegasus 40', 'air-zoom-pegasus.jpeg', 1, b'0');
+INSERT INTO `silhouettes` VALUES (3, 'Stan Smith', 'stan-smith.webp', 2, b'0');
+INSERT INTO `silhouettes` VALUES (4, 'Ultraboost Light', 'ultraboost-light.png', 2, b'0');
+INSERT INTO `silhouettes` VALUES (5, 'Vans Old Skool', 'vans-old-skool.jpg', 3, b'0');
+INSERT INTO `silhouettes` VALUES (6, 'Vans Slip-On Checkerboard', 'converse-run-star-hike.webp', 3, b'0');
+INSERT INTO `silhouettes` VALUES (7, 'Converse Chuck Taylor All Star', 'converse-chuck-taylor-all-star.jpg', 4, b'0');
+INSERT INTO `silhouettes` VALUES (8, 'Converse Run Star Hike', 'converse-run-star-hike.webp', 4, b'0');
+INSERT INTO `silhouettes` VALUES (9, 'Puma Suede Classic', 'puma-suede-classic.webp', 5, b'0');
+INSERT INTO `silhouettes` VALUES (10, 'Puma RS-X Toys', 'puma-rs-x-toys.jpeg', 5, b'0');
 
 -- ----------------------------
 -- Table structure for user_vouchers
