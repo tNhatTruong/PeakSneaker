@@ -245,6 +245,7 @@ public class ProductService {
                 .silhouette(silhouetteResponse)
                 .gender(product.getGender() != null ? product.getGender().name() : null)
                 .productType(product.getProductType() != null ? product.getProductType().name() : null)
+                .attributes(product.getAttributes())
                 .isFeatured(product.getIsFeatured()).isNew(isNew).isDeleted(product.getIsDeleted())
                 .images(imageResponses).variants(variantResponses).build();
     }
