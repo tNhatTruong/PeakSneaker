@@ -42,5 +42,37 @@ public class SupplierClaimResponse {
     private String settlementMethod; // "DEBIT_NOTE_OFFSET" or "CASH_REFUND_OR_REPLACEMENT"
     private String legalNotice;
     private List<BatchTraceabilityResponse.TraceabilityRmaItem> defectEvidences;
+
+    public String getClaimReferenceCode() {
+        return claimNumber;
+    }
+
+    public String getVariantSku() {
+        return sku;
+    }
+
+    public String getVariantColor() {
+        return color;
+    }
+
+    public String getVariantSize() {
+        return size;
+    }
+
+    public Integer getQuantityImported() {
+        return initialImportedQuantity != null ? initialImportedQuantity : 0;
+    }
+
+    public Integer getDefectiveFromCustomersCount() {
+        return defectiveCustomerCount != null ? defectiveCustomerCount : 0;
+    }
+
+    public Integer getQuarantinedQuantity() {
+        return quarantinedRemainingCount != null ? quarantinedRemainingCount : 0;
+    }
+
+    public String getRecommendation() {
+        return legalNotice;
+    }
 }
 

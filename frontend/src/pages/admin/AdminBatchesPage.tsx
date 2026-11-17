@@ -126,6 +126,7 @@ export default function AdminBatchesPage() {
       setQuarantining(true);
       const willQuarantine = !quarantineTargetBatch.isQuarantined;
       const updated = await AdminBatchesService.toggleQuarantine(quarantineTargetBatch.id, {
+        isQuarantined: willQuarantine,
         quarantine: willQuarantine,
         reason: willQuarantine ? quarantineReason.trim() : undefined,
       });
@@ -604,17 +605,18 @@ export default function AdminBatchesPage() {
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between flex-wrap gap-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center font-bold text-slate-400">
-                    {traceData.productImageUrl ? (
-                      <img src={traceData.productImageUrl} alt="" className="w-full h-full object-cover" />
+                    {(traceData.productImageUrl ?? traceData.batch?.productImageUrl) ? (
+                      <img src={(traceData.productImageUrl ?? traceData.batch?.productImageUrl) || ''} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <Boxes className="w-6 h-6 text-slate-400" />
                     )}
                   </div>
                   <div>
-                    <h4 className="text-sm font-black text-slate-900">{traceData.productName}</h4>
+                    <h4 className="text-sm font-black text-slate-900">{traceData.productName ?? traceData.batch?.productName ?? 'Sản phẩm'}</h4>
                     <p className="text-xs font-mono text-slate-500">
-                      SKU: <strong>{traceData.variantSku}</strong> {traceData.color ? `· Màu: ${traceData.color}` : ''}{' '}
-                      {traceData.size ? `· Size: ${traceData.size}` : ''}
+                      SKU: <strong>{traceData.variantSku ?? traceData.batch?.variantSku ?? '—'}</strong>{' '}
+                      {(traceData.color ?? traceData.batch?.variantColor) ? `· Màu: ${traceData.color ?? traceData.batch?.variantColor}` : ''}{' '}
+                      {(traceData.size ?? traceData.batch?.variantSize) ? `· Size: ${traceData.size ?? traceData.batch?.variantSize}` : ''}
                     </p>
                   </div>
                 </div>
@@ -622,11 +624,11 @@ export default function AdminBatchesPage() {
                 <div className="flex items-center gap-3">
                   <div className="text-right">
                     <p className="text-[11px] text-slate-400">Đơn hàng bị ảnh hưởng</p>
-                    <p className="text-base font-black text-blue-600">{traceData.orders.length} đơn</p>
+                    <p className="text-base font-black text-blue-600">{(traceData.relatedOrders ?? traceData.orders ?? []).length} đơn</p>
                   </div>
                   <div className="text-right border-l pl-3 border-slate-200">
                     <p className="text-[11px] text-slate-400">Khiếu nại RMA</p>
-                    <p className="text-base font-black text-rose-600">{traceData.returns.length} khiếu nại</p>
+                    <p className="text-base font-black text-rose-600">{(traceData.relatedRmaReturns ?? traceData.returns ?? []).length} khiếu nại</p>
                   </div>
                 </div>
               </div>
@@ -637,48 +639,51 @@ export default function AdminBatchesPage() {
                 <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 space-y-3">
                   <div className="flex items-center justify-between border-b pb-2 border-slate-100">
                     <span className="text-xs font-black uppercase text-slate-700 flex items-center gap-1.5">
-                      <Boxes className="w-4 h-4 text-emerald-600" /> 1. Lô nhập từ NCC ({traceData.batches.length})
+                      <Boxes className="w-4 h-4 text-emerald-600" /> 1. Lô nhập từ NCC ({(traceData.batches ?? (traceData.batch ? [traceData.batch] : [])).length})
                     </span>
                   </div>
                   <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
-                    {traceData.batches.map((b) => (
-                      <div
-                        key={b.batchId}
-                        className={`p-3 rounded-xl border text-xs space-y-1.5 ${
-                          b.isQuarantined
-                            ? 'border-rose-300 bg-rose-50/60'
-                            : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono font-bold text-blue-600">{b.batchCode}</span>
-                          {b.isQuarantined ? (
-                            <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-extrabold text-[10px]">
-                              Bị phong tỏa
-                            </span>
-                          ) : (
-                            <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">
-                              Tồn: {b.quantityRemaining}
-                            </span>
-                          )}
+                    {(traceData.batches ?? (traceData.batch ? [traceData.batch] : [])).map((b) => {
+                      const resolvedBatchId = ('batchId' in b && b.batchId != null ? b.batchId : b.id) ?? 0;
+                      return (
+                        <div
+                          key={resolvedBatchId || b.batchCode}
+                          className={`p-3 rounded-xl border text-xs space-y-1.5 ${
+                            b.isQuarantined
+                              ? 'border-rose-300 bg-rose-50/60'
+                              : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono font-bold text-blue-600">{b.batchCode}</span>
+                            {b.isQuarantined ? (
+                              <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-extrabold text-[10px]">
+                                Bị phong tỏa
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                                Tồn: {b.quantityRemaining}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-slate-600 font-semibold">{b.supplierName}</p>
+                          <div className="flex justify-between text-[11px] text-slate-400">
+                            <span>PO: {b.poNumber || '—'}</span>
+                            <span>HĐ: {b.invoiceNumber || '—'}</span>
+                          </div>
+                          <div className="pt-1 border-t border-slate-200/60 flex justify-between items-center text-[11px]">
+                            <span className="text-slate-500">Giá vốn: {formatVND(b.unitCost)}</span>
+                            <button
+                              type="button"
+                              onClick={() => void handleLoadClaim(resolvedBatchId)}
+                              className="text-purple-600 hover:underline font-bold"
+                            >
+                              Lập hồ sơ →
+                            </button>
+                          </div>
                         </div>
-                        <p className="text-slate-600 font-semibold">{b.supplierName}</p>
-                        <div className="flex justify-between text-[11px] text-slate-400">
-                          <span>PO: {b.poNumber || '—'}</span>
-                          <span>HĐ: {b.invoiceNumber || '—'}</span>
-                        </div>
-                        <div className="pt-1 border-t border-slate-200/60 flex justify-between items-center text-[11px]">
-                          <span className="text-slate-500">Giá vốn: {formatVND(b.unitCost)}</span>
-                          <button
-                            type="button"
-                            onClick={() => void handleLoadClaim(b.batchId)}
-                            className="text-purple-600 hover:underline font-bold"
-                          >
-                            Lập hồ sơ →
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -686,19 +691,19 @@ export default function AdminBatchesPage() {
                 <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 space-y-3">
                   <div className="flex items-center justify-between border-b pb-2 border-slate-100">
                     <span className="text-xs font-black uppercase text-slate-700 flex items-center gap-1.5">
-                      <PackageCheck className="w-4 h-4 text-blue-600" /> 2. Đơn hàng đã giao ({traceData.orders.length})
+                      <PackageCheck className="w-4 h-4 text-blue-600" /> 2. Đơn hàng đã giao ({(traceData.relatedOrders ?? traceData.orders ?? []).length})
                     </span>
                   </div>
                   <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
-                    {traceData.orders.length === 0 ? (
+                    {(traceData.relatedOrders ?? traceData.orders ?? []).length === 0 ? (
                       <p className="text-xs text-slate-400 py-6 text-center">Chưa xuất bán đơn hàng nào từ biến thể này.</p>
                     ) : (
-                      traceData.orders.map((o) => (
+                      (traceData.relatedOrders ?? traceData.orders ?? []).map((o) => (
                         <div key={o.orderId} className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs space-y-1">
                           <div className="flex items-center justify-between">
                             <span className="font-mono font-bold text-blue-600">{o.orderCode}</span>
                             <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold">
-                              SL: {o.quantityOrdered}
+                              SL: {o.quantityOrdered ?? o.quantity ?? 0}
                             </span>
                           </div>
                           <p className="text-slate-700 font-semibold">{o.customerName}</p>
@@ -716,49 +721,55 @@ export default function AdminBatchesPage() {
                 <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 space-y-3">
                   <div className="flex items-center justify-between border-b pb-2 border-slate-100">
                     <span className="text-xs font-black uppercase text-slate-700 flex items-center gap-1.5">
-                      <ShieldAlert className="w-4 h-4 text-rose-600" /> 3. Bằng chứng lỗi / RMA ({traceData.returns.length})
+                      <ShieldAlert className="w-4 h-4 text-rose-600" /> 3. Bằng chứng lỗi / RMA ({(traceData.relatedRmaReturns ?? traceData.returns ?? []).length})
                     </span>
                   </div>
                   <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
-                    {traceData.returns.length === 0 ? (
+                    {(traceData.relatedRmaReturns ?? traceData.returns ?? []).length === 0 ? (
                       <p className="text-xs text-slate-400 py-6 text-center">Chưa có phản ánh lỗi RMA nào từ khách.</p>
                     ) : (
-                      traceData.returns.map((r) => (
-                        <div key={r.returnId} className="p-3 rounded-xl border border-rose-200 bg-rose-50/40 text-xs space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-rose-700">RMA #{r.returnId}</span>
-                            <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-black">
-                              Lỗi: {r.quantityReturned} SP
-                            </span>
-                          </div>
-                          <p className="text-slate-800 font-semibold">Lý do: {r.returnReason}</p>
-                          {r.customerNotes && (
-                            <p className="text-[11px] text-slate-600 bg-white p-1.5 rounded border border-rose-100 italic">
-                              "{r.customerNotes}"
-                            </p>
-                          )}
-                          {r.evidenceImages && r.evidenceImages.length > 0 && (
-                            <div className="flex items-center gap-1.5 pt-1">
-                              {r.evidenceImages.slice(0, 3).map((img, idx) => (
-                                <a
-                                  key={idx}
-                                  href={img}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="w-10 h-10 rounded border border-slate-200 overflow-hidden block"
-                                >
-                                  <img src={img} alt="Bằng chứng" className="w-full h-full object-cover" />
-                                </a>
-                              ))}
-                              {r.evidenceImages.length > 3 && (
-                                <span className="text-[10px] text-slate-500 font-bold">
-                                  +{r.evidenceImages.length - 3} ảnh
-                                </span>
-                              )}
+                      (traceData.relatedRmaReturns ?? traceData.returns ?? []).map((r) => {
+                        const rmaId = r.returnId ?? r.rmaId ?? 0;
+                        const qtyReturned = r.quantityReturned ?? r.approvedQuantity ?? r.requestedQuantity ?? 0;
+                        const reasonText = r.returnReason ?? r.reasonLabel ?? r.reasonCode ?? 'Lỗi kỹ thuật';
+                        const notesText = r.customerNotes ?? r.customerNote;
+                        return (
+                          <div key={rmaId} className="p-3 rounded-xl border border-rose-200 bg-rose-50/40 text-xs space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-rose-700">RMA #{rmaId}</span>
+                              <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-black">
+                                Lỗi: {qtyReturned} SP
+                              </span>
                             </div>
-                          )}
-                        </div>
-                      ))
+                            <p className="text-slate-800 font-semibold">Lý do: {reasonText}</p>
+                            {notesText && (
+                              <p className="text-[11px] text-slate-600 bg-white p-1.5 rounded border border-rose-100 italic">
+                                "{notesText}"
+                              </p>
+                            )}
+                            {r.evidenceImages && r.evidenceImages.length > 0 && (
+                              <div className="flex items-center gap-1.5 pt-1">
+                                {r.evidenceImages.slice(0, 3).map((img, idx) => (
+                                  <a
+                                    key={idx}
+                                    href={img}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="w-10 h-10 rounded border border-slate-200 overflow-hidden block"
+                                  >
+                                    <img src={img} alt="Bằng chứng" className="w-full h-full object-cover" />
+                                  </a>
+                                ))}
+                                {r.evidenceImages.length > 3 && (
+                                  <span className="text-[10px] text-slate-500 font-bold">
+                                    +{r.evidenceImages.length - 3} ảnh
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -801,7 +812,7 @@ export default function AdminBatchesPage() {
               <div className="flex items-center justify-between border-b border-slate-200 pb-5">
                 <div>
                   <span className="px-2.5 py-1 rounded bg-purple-100 text-purple-800 font-mono font-black text-xs">
-                    {claimData.claimReferenceCode}
+                    {claimData.claimReferenceCode ?? claimData.claimNumber}
                   </span>
                   <h2 className="text-lg font-black text-slate-900 mt-2">
                     BIÊN BẢN KHIẾU NẠI & YÊU CẦU BỒI HOÀN LÔ HÀNG LỖI
@@ -848,7 +859,7 @@ export default function AdminBatchesPage() {
                   </div>
                   <div className="p-3 rounded-lg border border-slate-200">
                     <span className="text-[10px] text-slate-400 font-bold block">Mã SKU Biến thể</span>
-                    <span className="font-mono font-bold text-slate-800 text-sm">{claimData.variantSku}</span>
+                    <span className="font-mono font-bold text-slate-800 text-sm">{claimData.variantSku ?? claimData.sku}</span>
                   </div>
                   <div className="p-3 rounded-lg border border-slate-200">
                     <span className="text-[10px] text-slate-400 font-bold block">Số hóa đơn VAT</span>
@@ -883,11 +894,11 @@ export default function AdminBatchesPage() {
                           <div className="text-[10px] text-slate-400">Đã kiểm định bằng chứng bung keo/lệch form</div>
                         </td>
                         <td className="py-2.5 px-4 text-center font-bold text-rose-600">
-                          {claimData.defectiveFromCustomersCount} đôi
+                          {claimData.defectiveFromCustomersCount ?? claimData.defectiveCustomerCount ?? 0} đôi
                         </td>
                         <td className="py-2.5 px-4 text-right font-mono">{formatVND(claimData.unitCost)}</td>
                         <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
-                          {formatVND(claimData.defectiveFromCustomersCount * claimData.unitCost)}
+                          {formatVND((claimData.defectiveFromCustomersCount ?? claimData.defectiveCustomerCount ?? 0) * claimData.unitCost)}
                         </td>
                       </tr>
                       <tr>
@@ -896,19 +907,19 @@ export default function AdminBatchesPage() {
                           <div className="text-[10px] text-slate-400">Ngừng xuất kho để ngăn chặn tổn thất thêm</div>
                         </td>
                         <td className="py-2.5 px-4 text-center font-bold text-amber-600">
-                          {claimData.quarantinedQuantity} đôi
+                          {claimData.quarantinedQuantity ?? claimData.quarantinedRemainingCount ?? 0} đôi
                         </td>
                         <td className="py-2.5 px-4 text-right font-mono">{formatVND(claimData.unitCost)}</td>
                         <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
-                          {formatVND(claimData.quarantinedQuantity * claimData.unitCost)}
+                          {formatVND((claimData.quarantinedQuantity ?? claimData.quarantinedRemainingCount ?? 0) * claimData.unitCost)}
                         </td>
                       </tr>
                       <tr className="bg-purple-50/60 font-black text-purple-900">
                         <td className="py-3 px-4">TỔNG CỘNG YÊU CẦU BỒI HOÀN</td>
-                        <td className="py-3 px-4 text-center text-sm">{claimData.totalClaimQuantity} đôi</td>
+                        <td className="py-3 px-4 text-center text-sm">{claimData.totalClaimQuantity ?? 0} đôi</td>
                         <td className="py-3 px-4 text-right font-mono">—</td>
                         <td className="py-3 px-4 text-right font-mono text-base text-purple-900">
-                          {formatVND(claimData.totalClaimAmount)}
+                          {formatVND(claimData.totalClaimAmount ?? 0)}
                         </td>
                       </tr>
                     </tbody>
@@ -922,7 +933,7 @@ export default function AdminBatchesPage() {
                   3. Đề xuất Phương án Thu hồi Công nợ (Debit Note / Refund)
                 </h4>
                 <div className="p-4 rounded-xl border border-purple-200 bg-purple-50/50 text-xs text-purple-900 leading-relaxed font-medium">
-                  {claimData.recommendation}
+                  {claimData.recommendation ?? claimData.legalNotice}
                 </div>
               </div>
 

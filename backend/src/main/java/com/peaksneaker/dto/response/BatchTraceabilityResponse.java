@@ -20,6 +20,34 @@ public class BatchTraceabilityResponse {
     private List<TraceabilityOrderItem> relatedOrders;
     private List<TraceabilityRmaItem> relatedRmaReturns;
 
+    public List<TraceabilityOrderItem> getOrders() {
+        return relatedOrders != null ? relatedOrders : List.of();
+    }
+
+    public List<TraceabilityRmaItem> getReturns() {
+        return relatedRmaReturns != null ? relatedRmaReturns : List.of();
+    }
+
+    public List<BatchResponse> getBatches() {
+        return batch != null ? List.of(batch) : List.of();
+    }
+
+    public String getProductName() {
+        return batch != null ? batch.getProductName() : null;
+    }
+
+    public String getVariantSku() {
+        return batch != null ? batch.getVariantSku() : null;
+    }
+
+    public String getVariantColor() {
+        return batch != null ? batch.getVariantColor() : null;
+    }
+
+    public String getVariantSize() {
+        return batch != null ? batch.getVariantSize() : null;
+    }
+
     @Data
     @Builder
     @NoArgsConstructor
@@ -34,6 +62,10 @@ public class BatchTraceabilityResponse {
         private BigDecimal unitPrice;
         private String orderStatus;
         private Instant orderDate;
+
+        public Integer getQuantityOrdered() {
+            return quantity != null ? quantity : 0;
+        }
     }
 
     @Data
@@ -52,6 +84,24 @@ public class BatchTraceabilityResponse {
         private String status;
         private List<String> evidenceImages;
         private Instant requestedAt;
+
+        public Long getReturnId() {
+            return rmaId;
+        }
+
+        public Integer getQuantityReturned() {
+            return approvedQuantity != null && approvedQuantity > 0
+                    ? approvedQuantity
+                    : (requestedQuantity != null ? requestedQuantity : 0);
+        }
+
+        public String getReturnReason() {
+            return reasonLabel != null ? reasonLabel : reasonCode;
+        }
+
+        public String getCustomerNotes() {
+            return customerNote;
+        }
     }
 }
 

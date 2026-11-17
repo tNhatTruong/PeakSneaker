@@ -28,14 +28,21 @@ export interface BatchItem {
 }
 
 export interface BatchTraceabilityResponse {
-  variantId: number;
-  variantSku: string;
-  productName: string;
+  batch?: BatchItem;
+  totalShipped?: number;
+  totalRemaining?: number;
+  totalRmaDefects?: number;
+  isQuarantined?: boolean;
+  quarantineReason?: string;
+  variantId?: number;
+  variantSku?: string;
+  productName?: string;
   productImageUrl?: string | null;
   color?: string;
   size?: string;
-  batches: Array<{
-    batchId: number;
+  batches?: Array<{
+    id?: number;
+    batchId?: number;
     batchCode: string;
     supplierName: string;
     quantityImported: number;
@@ -44,32 +51,73 @@ export interface BatchTraceabilityResponse {
     poNumber?: string;
     invoiceNumber?: string;
     paymentStatus?: string;
-    isQuarantined: boolean;
+    isQuarantined?: boolean;
     quarantineReason?: string;
     receivedDate: string;
   }>;
-  orders: Array<{
+  orders?: Array<{
     orderId: number;
     orderCode: string;
     customerName: string;
     customerPhone?: string;
-    quantityOrdered: number;
+    quantity?: number;
+    quantityOrdered?: number;
     orderStatus: string;
     orderDate: string;
   }>;
-  returns: Array<{
-    returnId: number;
+  relatedOrders?: Array<{
+    orderId: number;
     orderCode: string;
-    quantityReturned: number;
-    returnReason: string;
-    returnStatus: string;
-    evidenceImages: string[];
+    customerName: string;
+    customerPhone?: string;
+    quantity?: number;
+    quantityOrdered?: number;
+    orderStatus: string;
+    orderDate: string;
+  }>;
+  returns?: Array<{
+    rmaId?: number;
+    returnId?: number;
+    orderId?: number;
+    orderCode?: string;
+    requestedQuantity?: number;
+    approvedQuantity?: number;
+    quantityReturned?: number;
+    reasonCode?: string;
+    reasonLabel?: string;
+    returnReason?: string;
+    status?: string;
+    returnStatus?: string;
+    evidenceImages?: string[];
+    customerNote?: string;
     customerNotes?: string;
-    createdAt: string;
+    requestedAt?: string;
+    createdAt?: string;
+  }>;
+  relatedRmaReturns?: Array<{
+    rmaId?: number;
+    returnId?: number;
+    orderId?: number;
+    orderCode?: string;
+    requestedQuantity?: number;
+    approvedQuantity?: number;
+    quantityReturned?: number;
+    reasonCode?: string;
+    reasonLabel?: string;
+    returnReason?: string;
+    status?: string;
+    returnStatus?: string;
+    evidenceImages?: string[];
+    customerNote?: string;
+    customerNotes?: string;
+    requestedAt?: string;
+    createdAt?: string;
   }>;
 }
 
 export interface SupplierClaimResponse {
+  claimNumber?: string;
+  claimReferenceCode?: string;
   batchId: number;
   batchCode: string;
   supplierName: string;
@@ -78,22 +126,27 @@ export interface SupplierClaimResponse {
   paymentStatus?: string;
   unitCost: number;
   productName: string;
-  variantSku: string;
+  sku?: string;
+  variantSku?: string;
   color?: string;
   size?: string;
-  totalReceived: number;
-  currentRemaining: number;
-  quarantinedQuantity: number;
-  defectiveFromCustomersCount: number;
+  initialImportedQuantity?: number;
+  totalReceived?: number;
+  currentRemaining?: number;
+  quarantinedRemainingCount?: number;
+  quarantinedQuantity?: number;
+  defectiveCustomerCount?: number;
+  defectiveFromCustomersCount?: number;
   totalClaimQuantity: number;
   totalClaimAmount: number;
-  recommendation: string;
-  claimReferenceCode: string;
+  legalNotice?: string;
+  recommendation?: string;
   generatedAt: string;
 }
 
 export interface QuarantineBatchPayload {
-  quarantine: boolean;
+  isQuarantined?: boolean;
+  quarantine?: boolean;
   reason?: string;
 }
 
@@ -112,6 +165,8 @@ export interface AuditLogItem {
   brandName?: string | null;
   changeType: string;
   quantityChanged: number;
+  balanceBefore?: number;
+  balanceAfter?: number;
   previousStock?: number;
   currentStock?: number;
   note?: string;
