@@ -1,10 +1,18 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
-import { AuthService } from "../../services/authService";
+import { isAxiosError } from "axios";
+import { AuthService, isStaffOrAdminRole } from "../../services/authService";
 import { useAuth } from "../../context/AuthContext";
 import { Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useGoogleLogin } from '@react-oauth/google';
+
+const getErrorMessage = (err: unknown, fallback: string): string => {
+  if (isAxiosError<{ message?: string }>(err)) {
+    return err.response?.data?.message || fallback;
+  }
+  return fallback;
+};
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -24,14 +32,14 @@ export default function LoginPage() {
         await login(data.token);
         toast.success("Đăng nhập bằng Google thành công!");
         
-        if (data.role === 'ROLE_ADMIN' || data.role === 'ADMIN') {
+        if (isStaffOrAdminRole(data.role)) {
           navigate("/admin/dashboard", { replace: true });
         } else {
           const from = location.state?.from?.pathname || "/";
           navigate(from, { replace: true });
         }
-      } catch (err: any) {
-        toast.error(err.response?.data?.message || "Đăng nhập Google thất bại.");
+      } catch (err: unknown) {
+        toast.error(getErrorMessage(err, "Đăng nhập Google thất bại."));
       } finally {
         setLoading(false);
       }
@@ -54,16 +62,16 @@ export default function LoginPage() {
 
       toast.success("Đăng nhập thành công!");
       
-      // Redirect to admin dashboard if role is admin
-      if (data.role === 'ROLE_ADMIN' || data.role === 'ADMIN') {
+      // Redirect to admin dashboard if role is admin/staff
+      if (isStaffOrAdminRole(data.role)) {
         navigate("/admin/dashboard", { replace: true });
       } else {
         // Redirect to previous page or home
         const from = location.state?.from?.pathname || "/";
         navigate(from, { replace: true });
       }
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || "Đăng nhập thất bại. Vui lòng thử lại.";
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, "Đăng nhập thất bại. Vui lòng thử lại.");
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
