@@ -3,6 +3,7 @@ package com.peaksneaker;
 import com.peaksneaker.entity.*;
 import com.peaksneaker.enums.DiscountType;
 import com.peaksneaker.enums.OrderStatus;
+import com.peaksneaker.enums.ProductType;
 import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -10,6 +11,13 @@ import java.time.temporal.ChronoUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 class DomainLogicTests {
+
+    @Test
+    void supportsEveryProductTypeStoredByTheCatalogDump() {
+        assertEquals(ProductType.SNEAKER, ProductType.valueOf("SNEAKER"));
+        assertEquals(ProductType.ACCESSORY, ProductType.valueOf("ACCESSORY"));
+        assertEquals(ProductType.SHOE_CARE, ProductType.valueOf("SHOE_CARE"));
+    }
 
     @Test
     void testProductVariantFinalPrice() {
@@ -22,7 +30,25 @@ class DomainLogicTests {
                 .priceAdjustment(BigDecimal.valueOf(15.50))
                 .build();
 
+        assertEquals(BigDecimal.valueOf(115.50), variant.getOriginalPrice());
         assertEquals(BigDecimal.valueOf(115.50), variant.getFinalPrice());
+    }
+
+    @Test
+    void testProductVariantFinalPriceWithDiscount() {
+        Product product = Product.builder()
+                .basePrice(BigDecimal.valueOf(2860000.00))
+                .discountPercent(BigDecimal.valueOf(5.00))
+                .build();
+
+        ProductVariant variant = ProductVariant.builder()
+                .product(product)
+                .priceAdjustment(BigDecimal.ZERO)
+                .build();
+
+        assertEquals(BigDecimal.valueOf(2860000.00), variant.getOriginalPrice());
+        // 2860000 * (1 - 0.05) = 2717000.00
+        assertEquals(0, BigDecimal.valueOf(2717000.00).compareTo(variant.getFinalPrice()));
     }
 
     @Test
@@ -113,7 +139,7 @@ class DomainLogicTests {
     }
 
     @Test
-    void testOrderLifecycleAndStockDeduction() {
+    void testOrderLifecycleDoesNotDeductReservedStockAgain() {
         ProductVariant variant = ProductVariant.builder()
                 .sku("NK-AF1-WHT-42")
                 .stockQuantity(10)
@@ -130,19 +156,26 @@ class DomainLogicTests {
 
         assertEquals(OrderStatus.PENDING, order.getStatus());
 
-        // 1. Advance to SHIPPING -> Stock should decrease from 10 to 7
+        order.advanceStatus(OrderStatus.CONFIRMED);
+        order.advanceStatus(OrderStatus.PROCESSING);
         order.advanceStatus(OrderStatus.SHIPPING);
         assertEquals(OrderStatus.SHIPPING, order.getStatus());
-        assertEquals(7, variant.getStockQuantity());
+        assertEquals(10, variant.getStockQuantity());
 
-        // 2. Cancel order from SHIPPING is not allowed directly without logic, but for test:
-        // Actually, in the new logic, cancel() only works in PENDING.
         assertThrows(IllegalStateException.class, order::cancel);
+        assertThrows(IllegalStateException.class, () -> order.advanceStatus(OrderStatus.PENDING));
+
+        order.advanceStatus(OrderStatus.DELIVERED);
+        assertNotNull(order.getDeliveredAt());
+        order.advanceStatus(OrderStatus.COMPLETED);
+        assertEquals(OrderStatus.COMPLETED, order.getStatus());
+        assertFalse(order.canTransitionTo(OrderStatus.CANCELLED));
+        assertEquals(10, variant.getStockQuantity());
         
-        // 3. Let's create another PENDING order and cancel it
-        Order pendingOrder = Order.builder().build();
-        pendingOrder.cancel();
-        assertEquals(OrderStatus.CANCELLED, pendingOrder.getStatus());
+        Order confirmedOrder = Order.builder().build();
+        confirmedOrder.advanceStatus(OrderStatus.CONFIRMED);
+        confirmedOrder.cancel();
+        assertEquals(OrderStatus.CANCELLED, confirmedOrder.getStatus());
     }
 
     @Test
