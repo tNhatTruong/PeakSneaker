@@ -8,7 +8,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Data
 public class SilhouetteRequest {
 
-    @NotBlank(message = "Tên dòng giày không được để trống")
+    @NotBlank(message = "Tên dòng sản phẩm không được để trống")
     private String name;
 
     private String description;

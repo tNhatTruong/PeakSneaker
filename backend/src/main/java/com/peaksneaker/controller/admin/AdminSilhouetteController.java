@@ -1,4 +1,4 @@
-package com.peaksneaker.controller;
+package com.peaksneaker.controller.admin;
 
 import com.peaksneaker.dto.request.SilhouetteRequest;
 import com.peaksneaker.dto.response.ApiResponse;
@@ -21,13 +21,13 @@ public class AdminSilhouetteController {
     @GetMapping("/brand/{brandId}")
     public ResponseEntity<ApiResponse<List<SilhouetteResponse>>> getSilhouettesByBrand(@PathVariable Long brandId) {
         List<SilhouetteResponse> silhouettes = silhouetteService.getSilhouettesByBrandId(brandId);
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách dòng giày thành công", silhouettes));
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách dòng sản phẩm thành công", silhouettes));
     }
 
     @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<ApiResponse<SilhouetteResponse>> createSilhouette(@Valid @ModelAttribute SilhouetteRequest request) {
         SilhouetteResponse silhouette = silhouetteService.createSilhouette(request);
-        return ResponseEntity.ok(ApiResponse.success("Thêm mới dòng giày thành công", silhouette));
+        return ResponseEntity.ok(ApiResponse.success("Thêm mới dòng sản phẩm thành công", silhouette));
     }
 
     @PutMapping(value = "/{id}", consumes = "multipart/form-data")
@@ -35,12 +35,12 @@ public class AdminSilhouetteController {
             @PathVariable Long id,
             @Valid @ModelAttribute SilhouetteRequest request) {
         SilhouetteResponse silhouette = silhouetteService.updateSilhouette(id, request);
-        return ResponseEntity.ok(ApiResponse.success("Cập nhật dòng giày thành công", silhouette));
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật dòng sản phẩm thành công", silhouette));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteSilhouette(@PathVariable Long id) {
         silhouetteService.deleteSilhouette(id);
-        return ResponseEntity.ok(ApiResponse.success("Xóa dòng giày thành công", null));
+        return ResponseEntity.ok(ApiResponse.success("Xóa dòng sản phẩm thành công", null));
     }
 }

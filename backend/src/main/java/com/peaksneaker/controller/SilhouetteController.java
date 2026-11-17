@@ -21,11 +21,11 @@ public class SilhouetteController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<SilhouetteResponse>>> getAllSilhouettes() {
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách dòng giày thành công", silhouetteService.getAllSilhouettes()));
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách dòng sản phẩm thành công", silhouetteService.getAllSilhouettes()));
     }
 
     @GetMapping("/brand/{brandId}")
     public ResponseEntity<ApiResponse<List<SilhouetteResponse>>> getSilhouettesByBrand(@PathVariable Long brandId) {
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách dòng giày theo thương hiệu thành công", silhouetteService.getSilhouettesByBrandId(brandId)));
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách dòng sản phẩm theo thương hiệu thành công", silhouetteService.getSilhouettesByBrandId(brandId)));
     }
 }
