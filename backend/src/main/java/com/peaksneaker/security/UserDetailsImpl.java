@@ -25,6 +25,14 @@ public class UserDetailsImpl implements UserDetails {
     private boolean isActive;
 
     public static UserDetailsImpl build(User user) {
+        return build(user, List.of(), List.of());
+    }
+
+    public static UserDetailsImpl build(
+            User user,
+            Collection<String> grantedPermissions,
+            Collection<String> revokedPermissions
+    ) {
         String authorityName = user.getRole() != null ? user.getRole().getAuthorityName() : "ROLE_USER";
         Set<String> authNames = new LinkedHashSet<>();
         authNames.add(authorityName);
@@ -95,6 +103,15 @@ public class UserDetailsImpl implements UserDetails {
                     "ROLE_USER", "USER",
                     "PROMOTION_VIEW", "PROMOTION_MANAGE", "PRODUCT_VIEW"
             ));
+        }
+
+        if (role != Role.ROLE_SUPER_ADMIN && role != Role.SUPER_ADMIN) {
+            if (grantedPermissions != null) {
+                authNames.addAll(grantedPermissions);
+            }
+            if (revokedPermissions != null) {
+                authNames.removeAll(revokedPermissions);
+            }
         }
 
         List<GrantedAuthority> authorities = authNames.stream()

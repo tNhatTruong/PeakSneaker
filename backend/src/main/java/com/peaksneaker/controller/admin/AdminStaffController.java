@@ -29,7 +29,7 @@ public class AdminStaffController {
     private final StaffService staffService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER', 'ROLE_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('STAFF_VIEW', 'STAFF_MANAGE', 'ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER', 'ROLE_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<PaginatedResponse<StaffResponse>>> getStaffList(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) String department,
@@ -61,14 +61,14 @@ public class AdminStaffController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER', 'ROLE_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('STAFF_VIEW', 'STAFF_MANAGE', 'ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER', 'ROLE_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<StaffResponse>> getStaffById(@PathVariable Long id) {
         StaffResponse response = staffService.getStaffById(id);
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin nhân viên thành công", response));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER', 'ROLE_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('STAFF_MANAGE', 'ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER', 'ROLE_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<StaffResponse>> createStaff(
             @Valid @RequestBody CreateStaffRequest request,
             @AuthenticationPrincipal UserDetails userDetails
@@ -79,7 +79,7 @@ public class AdminStaffController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER', 'ROLE_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('STAFF_MANAGE', 'ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER', 'ROLE_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<StaffResponse>> updateStaff(
             @PathVariable Long id,
             @Valid @RequestBody UpdateStaffRequest request,
@@ -103,7 +103,7 @@ public class AdminStaffController {
     }
 
     @PutMapping("/{id}/permissions")
-    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER', 'ROLE_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('STAFF_PERMISSION_ASSIGN', 'ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER', 'ROLE_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<StaffResponse>> updateStaffPermissions(
             @PathVariable Long id,
             @RequestBody UpdateStaffPermissionsRequest request,
@@ -115,7 +115,7 @@ public class AdminStaffController {
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER', 'ROLE_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('STAFF_MANAGE', 'ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER', 'ROLE_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<StaffResponse>> updateStaffStatus(
             @PathVariable Long id,
             @RequestBody Map<String, String> body,
@@ -128,14 +128,14 @@ public class AdminStaffController {
     }
 
     @GetMapping("/roles")
-    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER', 'ROLE_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('STAFF_VIEW', 'STAFF_MANAGE', 'ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER', 'ROLE_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<RoleResponse>>> getAllRoles() {
         List<RoleResponse> response = staffService.getAllRoles();
         return ResponseEntity.ok(ApiResponse.success("Lấy danh mục vai trò thành công", response));
     }
 
     @GetMapping("/permissions")
-    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER', 'ROLE_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('STAFF_VIEW', 'STAFF_MANAGE', 'ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER', 'ROLE_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<PermissionResponse>>> getAllPermissions() {
         List<PermissionResponse> response = staffService.getAllPermissions();
         return ResponseEntity.ok(ApiResponse.success("Lấy danh mục quyền hạn thành công", response));

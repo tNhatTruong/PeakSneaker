@@ -59,6 +59,7 @@ export interface LoginResponse {
   fullName: string;
   role: string;
   hasPassword?: boolean;
+  permissions?: string[];
 }
 
 export interface UserResponse {
@@ -69,6 +70,7 @@ export interface UserResponse {
   address: string;
   role: string;
   hasPassword?: boolean;
+  permissions?: string[];
   createdAt: string;
 }
 

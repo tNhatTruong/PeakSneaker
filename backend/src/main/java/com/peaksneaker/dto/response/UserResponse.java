@@ -27,4 +27,5 @@ public class UserResponse {
     private String customerTier; // VIP, LOYAL, REGULAR
     private String location;
     private java.time.Instant lastOrderDate;
+    private java.util.List<String> permissions;
 }

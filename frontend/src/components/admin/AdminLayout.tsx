@@ -31,6 +31,7 @@ interface AdminNavItem {
   path: string;
   icon: LucideIcon;
   roles?: string[]; // Danh sách vai trò được phép truy cập (nếu rỗng/undefined thì cho phép tất cả nhân sự)
+  permissions?: string[]; // Quyền nguyên tử cho phép mở khóa truy cập động từ user_permissions
 }
 
 interface AdminNavGroup {
@@ -66,6 +67,7 @@ export default function AdminLayout() {
   }
 
   const userRole = (user?.role || "").trim().toUpperCase();
+  const userPermissions = user?.permissions || [];
 
   const isRoleAllowedForItem = (item: AdminNavItem): boolean => {
     if (!userRole) return false;
@@ -77,6 +79,10 @@ export default function AdminLayout() {
       userRole === "ADMIN"
     ) {
       return true;
+    }
+    // Nếu người dùng đã có danh sách quyền hiệu lực từ Backend (bao gồm ghi đè user_permissions), ưu tiên đối chiếu theo permission
+    if (userPermissions.length > 0 && item.permissions && item.permissions.length > 0) {
+      return item.permissions.some((perm) => userPermissions.includes(perm));
     }
     if (!item.roles || item.roles.length === 0) return true;
     return item.roles.some((r) => {
@@ -94,12 +100,14 @@ export default function AdminLayout() {
           path: "/admin/dashboard",
           icon: LayoutDashboard,
           roles: ["SUPER_ADMIN", "ADMIN", "STAFF_MANAGER", "WAREHOUSE", "SALES", "SUPPORT", "MARKETING"],
+          permissions: ["DASHBOARD_VIEW", "DASHBOARD_FINANCIAL"],
         },
         {
           name: "Dự báo & Cảnh báo",
           path: "/admin/forecast",
           icon: TrendingUp,
           roles: ["SUPER_ADMIN", "ADMIN", "WAREHOUSE"],
+          permissions: ["INVENTORY_FORECAST", "INVENTORY_VIEW"],
         },
       ],
     },
@@ -111,12 +119,14 @@ export default function AdminLayout() {
           path: "/admin/orders",
           icon: Package,
           roles: ["SUPER_ADMIN", "ADMIN", "SALES", "SUPPORT"],
+          permissions: ["ORDER_VIEW", "ORDER_CREATE", "ORDER_UPDATE_STATUS"],
         },
         {
           name: "Đổi trả (RMA)",
           path: "/admin/returns",
           icon: RotateCcw,
           roles: ["SUPER_ADMIN", "ADMIN", "SALES", "SUPPORT", "WAREHOUSE"],
+          permissions: ["ORDER_RETURN_MANAGE", "ORDER_VIEW"],
         },
       ],
     },
@@ -128,30 +138,35 @@ export default function AdminLayout() {
           path: "/admin/products",
           icon: ShoppingBag,
           roles: ["SUPER_ADMIN", "ADMIN", "MARKETING", "WAREHOUSE", "SALES", "SUPPORT"],
+          permissions: ["PRODUCT_VIEW", "PRODUCT_CREATE", "PRODUCT_EDIT"],
         },
         {
           name: "Tồn kho & Biến thể",
           path: "/admin/inventory",
           icon: Layers,
           roles: ["SUPER_ADMIN", "ADMIN", "WAREHOUSE"],
+          permissions: ["INVENTORY_VIEW", "INVENTORY_IMPORT", "INVENTORY_ADJUST"],
         },
         {
           name: "Lô hàng & Truy xuất",
           path: "/admin/batches",
           icon: Boxes,
           roles: ["SUPER_ADMIN", "ADMIN", "WAREHOUSE"],
+          permissions: ["INVENTORY_VIEW", "INVENTORY_IMPORT"],
         },
         {
           name: "Danh mục",
           path: "/admin/categories",
           icon: FolderTree,
           roles: ["SUPER_ADMIN", "ADMIN", "MARKETING"],
+          permissions: ["BRAND_CATEGORY_MANAGE", "PRODUCT_CREATE", "PRODUCT_EDIT"],
         },
         {
           name: "Thương hiệu",
           path: "/admin/brands",
           icon: Tags,
           roles: ["SUPER_ADMIN", "ADMIN", "MARKETING"],
+          permissions: ["BRAND_CATEGORY_MANAGE", "PRODUCT_CREATE", "PRODUCT_EDIT"],
         },
       ],
     },
@@ -163,24 +178,28 @@ export default function AdminLayout() {
           path: "/admin/customers",
           icon: Users,
           roles: ["SUPER_ADMIN", "ADMIN", "STAFF_MANAGER", "SALES", "SUPPORT"],
+          permissions: ["CUSTOMER_VIEW", "CUSTOMER_MANAGE"],
         },
         {
           name: "Nhân sự & Phân quyền",
           path: "/admin/staff",
           icon: ShieldCheck,
           roles: ["SUPER_ADMIN", "ADMIN", "STAFF_MANAGER"],
+          permissions: ["STAFF_VIEW", "STAFF_MANAGE", "STAFF_PERMISSION_ASSIGN"],
         },
         {
           name: "Khuyến mãi",
           path: "/admin/vouchers",
           icon: Ticket,
           roles: ["SUPER_ADMIN", "ADMIN", "MARKETING", "SALES"],
+          permissions: ["PROMOTION_VIEW", "PROMOTION_MANAGE"],
         },
         {
           name: "Nhật ký Hoạt động",
           path: "/admin/audit-logs",
           icon: History,
           roles: ["SUPER_ADMIN", "ADMIN", "STAFF_MANAGER"],
+          permissions: ["AUDIT_LOG_VIEW"],
         },
       ],
     },

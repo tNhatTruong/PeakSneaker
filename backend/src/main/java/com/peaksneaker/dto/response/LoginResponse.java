@@ -16,4 +16,5 @@ public class LoginResponse {
     private String fullName;
     private Role role;
     private Boolean hasPassword;
+    private java.util.List<String> permissions;
 }
