@@ -2,13 +2,14 @@
   "name": "peaksneaker-root",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "pnpm@12.6.0",
   "scripts": {
-    "dev": "npm run db:mysql && concurrently -c \"cyan,magenta\" -n \"BACKEND,FRONTEND\" \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:pg": "npm run db:postgres && concurrently -c \"cyan,magenta\" -n \"BACKEND,FRONTEND\" \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "db:mysql": "cd infra && docker-compose up mysql -d",
-    "db:postgres": "cd infra && docker-compose --profile postgres up postgres -d",
+    "start": "pnpm dev",
+    "dev": "pnpm db && concurrently -k -c \"cyan,magenta\" -n \"BACKEND,FRONTEND\" \"pnpm dev:backend\" \"pnpm dev:frontend\"",
+    "db": "docker compose -f infra/docker-compose.yml up -d",
+    "db:stop": "docker compose -f infra/docker-compose.yml down",
     "dev:backend": "cd backend && gradlew bootRun",
-    "dev:frontend": "cd frontend && npm run dev"
+    "dev:frontend": "pnpm --dir frontend dev"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
