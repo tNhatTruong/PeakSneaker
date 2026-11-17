@@ -17,8 +17,14 @@ public class CategoryResponse {
     private String description;
     private Long parentId;
     private String parentName;
+    private Boolean isActive;
+    private Long productCount;
 
     public static CategoryResponse fromEntity(Category category) {
+        return fromEntity(category, 0L);
+    }
+
+    public static CategoryResponse fromEntity(Category category, long productCount) {
         if (category == null) return null;
         return CategoryResponse.builder()
                 .id(category.getId())
@@ -27,6 +33,8 @@ public class CategoryResponse {
                 .description(category.getDescription())
                 .parentId(category.getParent() != null ? category.getParent().getId() : null)
                 .parentName(category.getParent() != null ? category.getParent().getName() : null)
+                .isActive(category.getIsActive())
+                .productCount(productCount)
                 .build();
     }
 }
