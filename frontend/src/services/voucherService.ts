@@ -6,7 +6,8 @@ export interface VoucherCheckRequest {
 }
 
 export interface VoucherCheckResponse {
-  isValid: boolean;
+  isValid?: boolean;
+  valid?: boolean;
   discountAmount: number;
   message: string;
 }

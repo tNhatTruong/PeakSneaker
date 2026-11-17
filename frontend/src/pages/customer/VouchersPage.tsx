@@ -151,7 +151,7 @@ export default function VouchersPage() {
 
     try {
       const checkRes = await VoucherService.checkVoucher({ code, subtotal: 1000000 });
-      if (checkRes.isValid) {
+      if (checkRes.isValid ?? checkRes.valid) {
         navigator.clipboard.writeText(code);
         setCopied(code);
         toast.success(`Mã ${code} hợp lệ và đã được sao chép vào bộ nhớ tạm!`);

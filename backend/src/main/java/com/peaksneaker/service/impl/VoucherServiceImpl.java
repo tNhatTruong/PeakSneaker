@@ -13,12 +13,16 @@ import com.peaksneaker.exception.ConflictException;
 import com.peaksneaker.exception.ResourceNotFoundException;
 import com.peaksneaker.repository.OrderRepository;
 import com.peaksneaker.repository.VoucherRepository;
+import com.peaksneaker.repository.VoucherUsageRepository;
+import com.peaksneaker.security.UserDetailsImpl;
 import com.peaksneaker.service.VoucherService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +38,7 @@ public class VoucherServiceImpl implements VoucherService {
 
     private final VoucherRepository voucherRepository;
     private final OrderRepository orderRepository;
+    private final VoucherUsageRepository voucherUsageRepository;
 
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("createdAt", "startAt", "expireAt", "code", "name");
 
@@ -155,7 +160,8 @@ public class VoucherServiceImpl implements VoucherService {
     @Override
     @Transactional(readOnly = true)
     public VoucherCheckResponse checkVoucher(VoucherCheckRequest request) {
-        Optional<Voucher> voucherOpt = voucherRepository.findByCode(request.getCode());
+        String normalizedCode = normalizeCode(request.getCode());
+        Optional<Voucher> voucherOpt = voucherRepository.findByCode(normalizedCode);
         
         if (voucherOpt.isEmpty()) {
             return VoucherCheckResponse.builder()
@@ -179,6 +185,21 @@ public class VoucherServiceImpl implements VoucherService {
                     .message(msg)
                     .discountAmount(BigDecimal.ZERO)
                     .build();
+        }
+
+        if (voucher.getPerUserLimit() != null && voucher.getPerUserLimit() > 0 && voucherUsageRepository != null) {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof UserDetailsImpl userDetails) {
+                long usedByUser = voucherUsageRepository.countByVoucherIdAndUserId(voucher.getId(), userDetails.getId());
+                if (usedByUser >= voucher.getPerUserLimit()) {
+                    return VoucherCheckResponse.builder()
+                            .isValid(false)
+                            .message("Bạn đã dùng hết số lượt cho phép của mã giảm giá này (tối đa "
+                                    + voucher.getPerUserLimit() + " lượt/khách)")
+                            .discountAmount(BigDecimal.ZERO)
+                            .build();
+                }
+            }
         }
         
         BigDecimal discount = voucher.calculateDiscount(request.getSubtotal());
