@@ -6,11 +6,67 @@ export interface UserResponse {
   email: string;
   firstName: string;
   lastName: string;
+  fullName: string;
   phone: string;
-  role: 'USER' | 'ADMIN';
+  role: string;
+  isVerified: boolean;
+  isActive: boolean;
+  hasPassword: boolean;
+  createdAt: string;
+  orderCount?: number;
+  totalSpent?: number;
+  customerTier?: 'VIP' | 'LOYAL' | 'REGULAR';
+  location?: string;
+  lastOrderDate?: string;
+}
+
+export interface CustomerAddress {
+  id: number;
+  recipientName: string;
+  phone: string;
+  provinceId: number;
+  provinceName: string;
+  districtId: number;
+  districtName: string;
+  wardCode: string;
+  wardName: string;
+  streetDetail: string;
+  isDefault: boolean;
+}
+
+export interface CustomerRecentOrder {
+  id: number;
+  orderCode: string;
+  totalAmount: number;
+  discountAmount: number;
+  shippingFee: number;
+  finalAmount: number;
+  status: string;
+  paymentMethod: string;
+  paymentStatus: string;
+  createdAt: string;
+  itemCount: number;
+}
+
+export interface CustomerDetailResponse {
+  id: number;
+  email: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  phone: string;
+  avatarUrl?: string;
   isVerified: boolean;
   isActive: boolean;
   createdAt: string;
+  orderCount: number;
+  totalSpent: number;
+  averageRating: number;
+  wishlistCount: number;
+  customerTier: 'VIP' | 'LOYAL' | 'REGULAR';
+  location: string;
+  addresses: CustomerAddress[];
+  recentOrders: CustomerRecentOrder[];
 }
 
 export interface UpdateUserRequest {
@@ -19,18 +75,26 @@ export interface UpdateUserRequest {
   phone: string;
 }
 
+export interface AdminUserQueryParams {
+  query?: string;
+  isActive?: boolean;
+  role?: string;
+  from?: string;
+  to?: string;
+  specificMonth?: string;
+  page?: number;
+  size?: number;
+}
+
 export const AdminUserService = {
-  getUsers: async (params?: {
-    query?: string;
-    isActive?: boolean;
-    role?: 'USER' | 'ADMIN';
-    specificMonth?: string; // format yyyy-MM
-    page?: number;
-    size?: number;
-  }) => {
+  getUsers: async (params?: AdminUserQueryParams) => {
     const response = await apiClient.get<ApiResponse<PaginatedResponse<UserResponse>>>('/admin/users', { params });
-    // @ts-ignore
     return response.data as PaginatedResponse<UserResponse>;
+  },
+
+  getCustomerDetail: async (id: number) => {
+    const response = await apiClient.get<ApiResponse<CustomerDetailResponse>>(`/admin/users/${id}/customer-detail`);
+    return response.data;
   },
 
   updateUserStatus: async (id: number, isActive: boolean) => {
@@ -40,7 +104,7 @@ export const AdminUserService = {
     return response.data;
   },
 
-  updateUserRole: async (id: number, role: 'USER' | 'ADMIN') => {
+  updateUserRole: async (id: number, role: string) => {
     const response = await apiClient.patch<ApiResponse<UserResponse>>(`/admin/users/${id}/role`, null, {
       params: { role }
     });

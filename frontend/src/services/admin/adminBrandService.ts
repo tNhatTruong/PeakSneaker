@@ -3,14 +3,19 @@ import apiClient, { type ApiResponse } from '../api';
 export interface BrandResponse {
   id: number;
   name: string;
+  slug?: string;
   logoUrl: string | null;
   description: string | null;
+  isActive: boolean;
+  isVisible: boolean;
+  activeProductCount: number;
   silhouettes: SilhouetteResponse[] | null;
 }
 
 export interface SilhouetteResponse {
   id: number;
   name: string;
+  slug?: string;
   imageUrl: string | null;
 }
 
@@ -19,7 +24,6 @@ export const AdminBrandService = {
     const response = await apiClient.get<ApiResponse<BrandResponse[]>>('/admin/brands', {
       params: keyword ? { keyword } : {},
     });
-    // @ts-ignore
     return response.data as BrandResponse[];
   },
 
@@ -33,7 +37,6 @@ export const AdminBrandService = {
     const response = await apiClient.post<ApiResponse<BrandResponse>>('/admin/brands', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
-    // @ts-ignore
     return response.data as BrandResponse;
   },
 
@@ -47,7 +50,13 @@ export const AdminBrandService = {
     const response = await apiClient.put<ApiResponse<BrandResponse>>(`/admin/brands/${id}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
-    // @ts-ignore
+    return response.data as BrandResponse;
+  },
+
+  updateVisibility: async (id: number, isActive: boolean): Promise<BrandResponse> => {
+    const response = await apiClient.patch<ApiResponse<BrandResponse>>(`/admin/brands/${id}/visibility`, {
+      isActive,
+    });
     return response.data as BrandResponse;
   },
 

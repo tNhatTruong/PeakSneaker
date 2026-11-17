@@ -9,7 +9,6 @@ export interface SilhouetteResponse {
 export const AdminSilhouetteService = {
   getByBrand: async (brandId: number): Promise<SilhouetteResponse[]> => {
     const response = await apiClient.get<ApiResponse<SilhouetteResponse[]>>(`/admin/silhouettes/brand/${brandId}`);
-    // @ts-ignore
     return response.data as SilhouetteResponse[];
   },
 
@@ -23,7 +22,6 @@ export const AdminSilhouetteService = {
     const response = await apiClient.post<ApiResponse<SilhouetteResponse>>('/admin/silhouettes', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
-    // @ts-ignore
     return response.data as SilhouetteResponse;
   },
 
@@ -37,7 +35,6 @@ export const AdminSilhouetteService = {
     const response = await apiClient.put<ApiResponse<SilhouetteResponse>>(`/admin/silhouettes/${id}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
-    // @ts-ignore
     return response.data as SilhouetteResponse;
   },
 
