@@ -1,665 +1,1100 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
-  Search, Plus, ArrowUpRight, ArrowDownLeft, Calendar,
-  Loader2, ImageIcon, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, X
+  AlertCircle,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Boxes,
+  CheckCircle2,
+  ExternalLink,
+  History,
+  ImageIcon,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Search,
+  Sparkles,
+  X,
 } from 'lucide-react';
-import { AdminProductService } from '../../services/admin/adminProductService';
-import { ProductService, type ProductResponse, type ProductDetailResponse } from '../../services/productService';
-import { AdminInventoryService, type InventoryTransactionResponse } from '../../services/admin/adminInventoryService';
+import AdminPageHeader from '../../components/admin/AdminPageHeader';
+import AdminPagination from '../../components/admin/AdminPagination';
+import AdminFilterHeader from '../../components/admin/AdminFilterHeader';
+import { AdminDetailEmptyState, AdminDetailPanel } from '../../components/admin/AdminDetailPanel';
+import { AdminBrandService, type BrandResponse as AdminBrandResponse } from '../../services/admin/adminBrandService';
+import { AdminCategoryService } from '../../services/admin/adminCategoryService';
+import { AdminBatchesService, type BatchItem } from '../../services/admin/adminBatchesService';
+import {
+  AdminInventoryService,
+  type InventoryStockStatus,
+  type InventoryTransactionResponse,
+  type InventoryVariantResponse,
+  type InventoryVariantSummaryResponse,
+} from '../../services/admin/adminInventoryService';
+import {
+  AdminProductService,
+  type AdminProductFilterOption,
+} from '../../services/admin/adminProductService';
+import type { CategoryResponse } from '../../services/categoryService';
+import { ProductService, type ProductDetailResponse, type ProductResponse } from '../../services/productService';
+import { SilhouetteService, type SilhouetteResponse } from '../../services/silhouetteService';
 
 type TransactionType = 'IMPORT' | 'EXPORT';
 
-const formatPrice = (price?: number | null) =>
-  price != null ? price.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' }) : '—';
+interface InventoryFilters {
+  brandId: string;
+  categoryId: string;
+  silhouetteId: string;
+  stockStatus: '' | InventoryStockStatus;
+}
+
+const EMPTY_FILTERS: InventoryFilters = {
+  brandId: '',
+  categoryId: '',
+  silhouetteId: '',
+  stockStatus: '',
+};
+
+const EMPTY_SUMMARY: InventoryVariantSummaryResponse = {
+  total: 0,
+  inStock: 0,
+  lowStock: 0,
+  outOfStock: 0,
+  inactive: 0,
+};
+
+const STANDARD_EU_SHOE_SIZES = Array.from({ length: 12 }, (_, index) => String(index + 35));
+const NON_SHOE_SIZES = ['ONE SIZE', 'S', 'M', 'L', 'XL'];
+
+const formatPrice = (price?: number | null) => (
+  price != null ? price.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' }) : '—'
+);
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (typeof error === 'object' && error !== null && 'response' in error) {
+    const response = (error as { response?: { data?: { message?: unknown } } }).response;
+    if (typeof response?.data?.message === 'string') return response.data.message;
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+};
+
+const getVariantStatus = (variant: InventoryVariantResponse) => {
+  if (variant.productInactive) {
+    return { label: 'Ngừng kinh doanh', className: 'border-violet-200 bg-violet-50 text-violet-700' };
+  }
+  if (variant.stock === 0) {
+    return { label: 'Hết hàng', className: 'border-red-200 bg-red-50 text-red-700' };
+  }
+  if (variant.stock <= variant.safetyStockThreshold) {
+    return { label: 'Sắp hết hàng', className: 'border-amber-200 bg-amber-50 text-amber-700' };
+  }
+  return { label: 'Còn nhiều', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
+};
+
+const normalizeFilters = (
+  filters: InventoryFilters,
+  options: AdminProductFilterOption[],
+): InventoryFilters => {
+  if (options.length === 0) return filters;
+  const brandId = filters.brandId ? Number(filters.brandId) : null;
+  const brandOptions = brandId == null ? options : options.filter((option) => option.brandId === brandId);
+  const categoryIds = new Set(brandOptions.map((option) => option.categoryId));
+  const categoryId = filters.categoryId && categoryIds.has(Number(filters.categoryId))
+    ? filters.categoryId
+    : brandId != null && categoryIds.size === 1
+      ? String([...categoryIds][0])
+      : '';
+  const silhouetteIds = new Set(brandOptions
+    .filter((option) => !categoryId || option.categoryId === Number(categoryId))
+    .map((option) => option.silhouetteId)
+    .filter((id): id is number => id != null));
+  return {
+    ...filters,
+    categoryId,
+    silhouetteId: filters.silhouetteId && silhouetteIds.has(Number(filters.silhouetteId))
+      ? filters.silhouetteId
+      : '',
+  };
+};
 
 export default function AdminInventoryPage() {
-  // Lựa chọn sản phẩm
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedProductId = Number(searchParams.get('productId'));
+  const requestedVariantId = Number(searchParams.get('variantId'));
+  const [scopedProductId, setScopedProductId] = useState<number | undefined>(
+    Number.isInteger(requestedProductId) && requestedProductId > 0 ? requestedProductId : undefined,
+  );
+
+  const [variants, setVariants] = useState<InventoryVariantResponse[]>([]);
+  const [summary, setSummary] = useState(EMPTY_SUMMARY);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
+  const [draftFilters, setDraftFilters] = useState<InventoryFilters>(EMPTY_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<InventoryFilters>(EMPTY_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
+  const [sort, setSort] = useState('createdAt-desc');
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
+
+  const [brands, setBrands] = useState<AdminBrandResponse[]>([]);
+  const [categories, setCategories] = useState<CategoryResponse[]>([]);
+  const [silhouettes, setSilhouettes] = useState<SilhouetteResponse[]>([]);
+  const [filterOptions, setFilterOptions] = useState<AdminProductFilterOption[]>([]);
+
+  const [detailVariant, setDetailVariant] = useState<InventoryVariantResponse | null>(null);
+  const [detailTab, setDetailTab] = useState<'info' | 'stock' | 'batches' | 'history'>('info');
+  const [detailTransactions, setDetailTransactions] = useState<InventoryTransactionResponse[]>([]);
+  const [loadingDetailTransactions, setLoadingDetailTransactions] = useState(false);
+  const [detailBatches, setDetailBatches] = useState<BatchItem[]>([]);
+  const [loadingDetailBatches, setLoadingDetailBatches] = useState(false);
+  const [thresholdInput, setThresholdInput] = useState<number>(5);
+  const [savingThreshold, setSavingThreshold] = useState(false);
+
+  const [showVariantModal, setShowVariantModal] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
   const [productList, setProductList] = useState<ProductResponse[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<number | ''>('');
   const [selectedProduct, setSelectedProduct] = useState<ProductDetailResponse | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-
-  // Modal tạo biến thể mới
-  const [showVariantModal, setShowVariantModal] = useState(false);
-  const [variantForm, setVariantForm] = useState({
-    color: '',
-    size: '',
-    sku: '',
-    priceAdjustment: 0,
-  });
-  const [submittingVariant, setSubmittingVariant] = useState(false);
+  const [variantForm, setVariantForm] = useState({ color: '', size: '', sku: '', priceAdjustment: 0 });
   const [variantError, setVariantError] = useState('');
+  const [submittingVariant, setSubmittingVariant] = useState(false);
 
-  // Modal Giao dịch kho (Nhập/Xuất)
   const [showTxModal, setShowTxModal] = useState(false);
   const [txType, setTxType] = useState<TransactionType>('IMPORT');
-  const [selectedVariant, setSelectedVariant] = useState<{ id: number; sku: string; color: string; size: string; stock: number } | null>(null);
+  const [transactionTarget, setTransactionTarget] = useState<InventoryVariantResponse | null>(null);
   const [txForm, setTxForm] = useState({
     quantity: 1,
     note: '',
+    batchCode: '',
+    supplierName: '',
+    unitCost: 0,
   });
-  const [submittingTx, setSubmittingTx] = useState(false);
   const [txError, setTxError] = useState('');
-
-  // Lịch sử giao dịch kho
-  const [transactions, setTransactions] = useState<InventoryTransactionResponse[]>([]);
-  const [loadingTx, setLoadingTx] = useState(false);
-  const [filterType, setFilterType] = useState<'ALL' | 'IMPORT' | 'EXPORT'>('ALL');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [txPage, setTxPage] = useState(0);
-  const [txTotalPages, setTxTotalPages] = useState(1);
-
-  // Thông báo chung
+  const [submittingTx, setSubmittingTx] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const showToast = (message: string, type: 'success' | 'error') => {
+  const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  // Tải danh sách sản phẩm để chọn
-  useEffect(() => {
-    setLoadingProducts(true);
-    AdminProductService.getAdminProducts({ size: 100 })
-      .then((res) => {
-        setProductList(res.items || []);
-      })
-      .catch(() => {
-        showToast('Không thể tải danh sách sản phẩm.', 'error');
-      })
-      .finally(() => {
-        setLoadingProducts(false);
-      });
-  }, []);
-
-  // Tải chi tiết sản phẩm được chọn (để lấy danh sách biến thể)
-  const loadProductDetail = useCallback(async (productId: number) => {
-    setLoadingDetail(true);
-    try {
-      const detail = await ProductService.getProductById(productId);
-      setSelectedProduct(detail);
-    } catch {
-      showToast('Không thể tải chi tiết sản phẩm.', 'error');
-    } finally {
-      setLoadingDetail(false);
-    }
+    window.setTimeout(() => setToast(null), 3000);
   }, []);
 
   useEffect(() => {
-    if (selectedProductId) {
-      loadProductDetail(Number(selectedProductId));
-    } else {
-      setSelectedProduct(null);
-    }
-  }, [selectedProductId, loadProductDetail]);
+    const hasOpenModal = Boolean(showVariantModal || showTxModal);
+    if (!hasOpenModal) return;
 
-  // Tải lịch sử giao dịch kho
-  const loadTransactions = useCallback(async () => {
-    setLoadingTx(true);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (showTxModal) {
+        setShowTxModal(false);
+        setTransactionTarget(null);
+        return;
+      }
+      if (showVariantModal) {
+        setShowVariantModal(false);
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [showTxModal, showVariantModal]);
+
+  const loadSummary = useCallback(async () => {
     try {
-      const typeParam = filterType === 'ALL' ? undefined : filterType;
-      const res = await AdminInventoryService.getTransactions({
-        productId: selectedProductId ? Number(selectedProductId) : undefined,
-        type: typeParam,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-        page: txPage,
-        size: 8,
-      });
-      setTransactions(res.items || []);
-      setTxTotalPages(res.totalPages || 1);
+      setSummary(await AdminInventoryService.getVariantSummary());
     } catch {
-      showToast('Không thể tải lịch sử giao dịch kho.', 'error');
-    } finally {
-      setLoadingTx(false);
+      setSummary(EMPTY_SUMMARY);
     }
-  }, [selectedProductId, filterType, startDate, endDate, txPage]);
+  }, []);
+
+  const loadVariants = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [sortBy, sortDirection] = sort.split('-');
+      const result = await AdminInventoryService.getVariants({
+        search: appliedSearch || undefined,
+        productId: scopedProductId,
+        brandId: appliedFilters.brandId ? Number(appliedFilters.brandId) : undefined,
+        categoryId: appliedFilters.categoryId ? Number(appliedFilters.categoryId) : undefined,
+        silhouetteId: appliedFilters.silhouetteId ? Number(appliedFilters.silhouetteId) : undefined,
+        stockStatus: appliedFilters.stockStatus || undefined,
+        page,
+        size: pageSize,
+        sortBy,
+        sortDirection,
+      });
+      setVariants(result.items ?? []);
+      setTotalPages(Math.max(result.totalPages ?? 1, 1));
+      setTotalElements(result.totalElements ?? 0);
+    } catch (error) {
+      setVariants([]);
+      showToast(getErrorMessage(error, 'Không thể tải danh sách biến thể kho.'), 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [appliedFilters, appliedSearch, page, pageSize, scopedProductId, showToast, sort]);
 
   useEffect(() => {
-    loadTransactions();
-  }, [loadTransactions]);
+    Promise.all([
+      AdminBrandService.getBrands(),
+      AdminCategoryService.getCategories(),
+      SilhouetteService.getAllSilhouettes(),
+      AdminProductService.getFilterOptions(),
+    ]).then(([brandData, categoryData, silhouetteData, optionData]) => {
+      setBrands(brandData);
+      setCategories(categoryData);
+      setSilhouettes(silhouetteData);
+      setFilterOptions(optionData);
+    }).catch(() => showToast('Không thể tải metadata bộ lọc kho.', 'error'));
+    loadSummary();
+  }, [loadSummary, showToast]);
 
-  // Submit tạo biến thể mới
-  const handleCreateVariant = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setVariantError('');
-    if (!selectedProductId) return;
-    if (!variantForm.sku.trim()) { setVariantError('Vui lòng nhập mã SKU.'); return; }
-    if (!variantForm.color.trim()) { setVariantError('Vui lòng nhập màu sắc.'); return; }
-    if (!variantForm.size.trim()) { setVariantError('Vui lòng nhập kích cỡ.'); return; }
+  useEffect(() => {
+    loadVariants();
+  }, [loadVariants]);
 
-    setSubmittingVariant(true);
-    try {
-      await AdminInventoryService.createVariant(Number(selectedProductId), {
-        color: variantForm.color.trim(),
-        size: variantForm.size.trim(),
-        sku: variantForm.sku.trim(),
-        priceAdjustment: variantForm.priceAdjustment,
-      });
-      showToast('Thêm biến thể mới thành công.', 'success');
-      setShowVariantModal(false);
-      setVariantForm({ color: '', size: '', sku: '', priceAdjustment: 0 });
-      // Reload danh sách biến thể
-      loadProductDetail(Number(selectedProductId));
-    } catch (err: any) {
-      setVariantError(err?.response?.data?.message ?? err?.message ?? 'Lỗi khi tạo biến thể.');
-    } finally {
-      setSubmittingVariant(false);
+  useEffect(() => {
+    if (filterOptions.length === 0) return;
+    setDraftFilters((current) => normalizeFilters(current, filterOptions));
+    setAppliedFilters((current) => normalizeFilters(current, filterOptions));
+  }, [filterOptions]);
+
+  useEffect(() => {
+    if (!Number.isInteger(requestedVariantId) || requestedVariantId <= 0 || loading) return;
+    const requested = variants.find((variant) => variant.id === requestedVariantId);
+    if (requested) {
+      setDetailVariant(requested);
+      const requestedAction = searchParams.get('action');
+      const suggestedQty = Number(searchParams.get('suggestedQty'));
+      if (requestedAction === 'import' && !requested.productInactive) {
+        const defaultSupplier = requested.brandName
+          ? `${requested.brandName} Official Distribution`
+          : 'Nhà phân phối chính hãng';
+        const defaultCost = Math.max(1000, Math.round((requested.finalPrice * 0.65) / 1000) * 1000);
+        setTransactionTarget(requested);
+        setTxType('IMPORT');
+        setTxForm({
+          quantity: Number.isInteger(suggestedQty) && suggestedQty > 0 ? suggestedQty : Math.max(5, requested.safetyStockThreshold),
+          note: 'Nhập bổ sung theo cảnh báo Dự báo tồn kho',
+          batchCode: '',
+          supplierName: defaultSupplier,
+          unitCost: defaultCost,
+        });
+        setTxError('');
+        setShowTxModal(true);
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('action');
+        nextParams.delete('suggestedQty');
+        setSearchParams(nextParams, { replace: true });
+      }
     }
-  };
+  }, [loading, requestedVariantId, searchParams, setSearchParams, variants]);
 
-  // Submit Giao dịch xuất/nhập kho
-  const handleCreateTransaction = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setTxError('');
-    if (!selectedVariant) return;
-    if (txForm.quantity <= 0) { setTxError('Số lượng giao dịch phải lớn hơn 0.'); return; }
-    if (txType === 'EXPORT' && selectedVariant.stock < txForm.quantity) {
-      setTxError(`Không đủ tồn kho để xuất. Tồn kho hiện tại: ${selectedVariant.stock}`);
+  const loadDetailTransactions = useCallback((variantId: number) => {
+    setLoadingDetailTransactions(true);
+    return AdminInventoryService.getTransactions({ variantId, page: 0, size: 8 })
+      .then((result) => setDetailTransactions(result.items ?? []))
+      .catch(() => setDetailTransactions([]))
+      .finally(() => setLoadingDetailTransactions(false));
+  }, []);
+
+  const loadDetailBatches = useCallback((variantId: number) => {
+    setLoadingDetailBatches(true);
+    return AdminBatchesService.getBatches({ variantId, page: 0, size: 10 })
+      .then((result) => setDetailBatches(result.items ?? []))
+      .catch(() => setDetailBatches([]))
+      .finally(() => setLoadingDetailBatches(false));
+  }, []);
+
+  const detailVariantId = detailVariant?.id;
+  const detailVariantThreshold = detailVariant?.safetyStockThreshold;
+
+  useEffect(() => {
+    if (!detailVariantId) {
+      setDetailTransactions([]);
+      setDetailBatches([]);
       return;
     }
+    setDetailTab('info');
+    void loadDetailTransactions(detailVariantId);
+    void loadDetailBatches(detailVariantId);
+  }, [detailVariantId, loadDetailBatches, loadDetailTransactions]);
 
+  useEffect(() => {
+    if (detailVariantThreshold != null) {
+      setThresholdInput(detailVariantThreshold);
+    }
+  }, [detailVariantId, detailVariantThreshold]);
+
+  useEffect(() => {
+    if (!showVariantModal) return;
+    const timer = window.setTimeout(() => {
+      setLoadingProducts(true);
+      AdminProductService.getAdminProducts({ search: productSearch.trim() || undefined, size: 100 })
+        .then((result) => setProductList((result.items ?? []).filter((product) => !product.isDeleted)))
+        .catch(() => setProductList([]))
+        .finally(() => setLoadingProducts(false));
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [productSearch, showVariantModal]);
+
+  useEffect(() => {
+    if (!selectedProductId) {
+      setSelectedProduct(null);
+      return;
+    }
+    ProductService.getProductById(Number(selectedProductId))
+      .then(setSelectedProduct)
+      .catch(() => setSelectedProduct(null));
+  }, [selectedProductId]);
+
+  const availableCategories = draftFilters.brandId
+    ? categories.filter((category) => filterOptions.some((option) => (
+      option.brandId === Number(draftFilters.brandId) && option.categoryId === category.id
+    )))
+    : categories;
+  const availableBrands = draftFilters.categoryId
+    ? brands.filter((brand) => filterOptions.some((option) => (
+      option.categoryId === Number(draftFilters.categoryId) && option.brandId === brand.id
+    )))
+    : brands;
+  const compatibleSilhouetteIds = new Set(filterOptions
+    .filter((option) => !draftFilters.brandId || option.brandId === Number(draftFilters.brandId))
+    .filter((option) => !draftFilters.categoryId || option.categoryId === Number(draftFilters.categoryId))
+    .map((option) => option.silhouetteId)
+    .filter((id): id is number => id != null));
+  const availableSilhouettes = silhouettes.filter((silhouette) => compatibleSilhouetteIds.has(silhouette.id));
+  const variantSizeOptions = selectedProduct?.productType === 'SNEAKER'
+    ? STANDARD_EU_SHOE_SIZES
+    : NON_SHOE_SIZES;
+
+  const statusTabs = useMemo(() => [
+    { value: '', label: 'Tất cả', count: summary.total },
+    { value: 'IN_STOCK', label: 'Còn nhiều', count: summary.inStock },
+    { value: 'LOW_STOCK', label: 'Sắp hết hàng', count: summary.lowStock },
+    { value: 'OUT_OF_STOCK', label: 'Hết hàng', count: summary.outOfStock },
+    { value: 'INACTIVE', label: 'Ngừng kinh doanh', count: summary.inactive },
+  ] as const, [summary]);
+
+  const recentMovement = useMemo(() => detailTransactions.reduce(
+    (totals, transaction) => ({
+      imported: totals.imported + (transaction.type === 'IMPORT' ? transaction.quantity : 0),
+      exported: totals.exported + (transaction.type === 'EXPORT' ? transaction.quantity : 0),
+    }),
+    { imported: 0, exported: 0 },
+  ), [detailTransactions]);
+
+  const activeFilterCount = Object.values(appliedFilters).filter(Boolean).length
+    + (appliedSearch ? 1 : 0)
+    + (scopedProductId ? 1 : 0);
+
+  const applyFilters = (event: React.FormEvent) => {
+    event.preventDefault();
+    const normalized = normalizeFilters(draftFilters, filterOptions);
+    setDraftFilters(normalized);
+    setAppliedFilters(normalized);
+    setAppliedSearch(search.trim());
+    setPage(0);
+  };
+
+  const clearFilters = () => {
+    setSearch('');
+    setAppliedSearch('');
+    setDraftFilters(EMPTY_FILTERS);
+    setAppliedFilters(EMPTY_FILTERS);
+    setScopedProductId(undefined);
+    setPage(0);
+    setSearchParams(new URLSearchParams());
+  };
+
+  const updateBrand = (brandId: string) => {
+    setDraftFilters((current) => normalizeFilters({ ...current, brandId, silhouetteId: '' }, filterOptions));
+  };
+
+  const updateCategory = (categoryId: string) => {
+    setDraftFilters((current) => {
+      const compatible = !current.brandId || !categoryId || filterOptions.some((option) => (
+        option.brandId === Number(current.brandId) && option.categoryId === Number(categoryId)
+      ));
+      return normalizeFilters({
+        ...current,
+        brandId: compatible ? current.brandId : '',
+        categoryId,
+        silhouetteId: '',
+      }, filterOptions);
+    });
+  };
+
+  const selectStatus = (stockStatus: '' | InventoryStockStatus) => {
+    setDraftFilters((current) => ({ ...current, stockStatus }));
+    setAppliedFilters((current) => ({ ...current, stockStatus }));
+    setPage(0);
+  };
+
+  const generateSuggestedBatchCode = (variant: InventoryVariantResponse) => {
+    const skuClean = variant.sku.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 8);
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const suffix = String(Math.floor(10 + Math.random() * 89));
+    return `BATCH-${skuClean}-${today}-${suffix}`;
+  };
+
+  const openTransaction = (type: TransactionType, variant: InventoryVariantResponse, suggestedQuantity?: number) => {
+    const latestBatch = detailVariant?.id === variant.id && detailBatches.length > 0 ? detailBatches[0] : null;
+    const defaultSupplier = latestBatch?.supplierName
+      || (variant.brandName ? `${variant.brandName} Official Distribution` : 'Nhà phân phối chính hãng');
+    const defaultCost = latestBatch?.unitCost
+      || Math.max(1000, Math.round((variant.finalPrice * 0.65) / 1000) * 1000);
+    setTransactionTarget(variant);
+    setTxType(type);
+    setTxForm({
+      quantity: suggestedQuantity && suggestedQuantity > 0 ? suggestedQuantity : (type === 'IMPORT' ? Math.max(5, variant.safetyStockThreshold) : 1),
+      note: '',
+      batchCode: '',
+      supplierName: defaultSupplier,
+      unitCost: defaultCost,
+    });
+    setTxError('');
+    setShowTxModal(true);
+  };
+
+  const handleCreateTransaction = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!transactionTarget) return;
+    if (txForm.quantity <= 0) {
+      setTxError('Số lượng giao dịch phải lớn hơn 0.');
+      return;
+    }
+    if (txType === 'EXPORT' && transactionTarget.stock < txForm.quantity) {
+      setTxError(`Không đủ tồn kho để xuất. Tồn kho hiện tại: ${transactionTarget.stock}.`);
+      return;
+    }
     setSubmittingTx(true);
     try {
       await AdminInventoryService.createTransaction({
-        variantId: selectedVariant.id,
+        variantId: transactionTarget.id,
         quantity: txForm.quantity,
         type: txType,
         note: txForm.note.trim() || undefined,
+        batchCode: txType === 'IMPORT' && txForm.batchCode.trim() ? txForm.batchCode.trim() : undefined,
+        supplierName: txType === 'IMPORT' && txForm.supplierName.trim() ? txForm.supplierName.trim() : undefined,
+        unitCost: txType === 'IMPORT' && txForm.unitCost > 0 ? txForm.unitCost : undefined,
       });
-      showToast(`${txType === 'IMPORT' ? 'Nhập' : 'Xuất'} kho thành công.`, 'success');
+      const delta = txType === 'IMPORT' ? txForm.quantity : -txForm.quantity;
+      setDetailVariant((current) => (
+        current && current.id === transactionTarget.id
+          ? { ...current, stock: Math.max(0, current.stock + delta) }
+          : current
+      ));
       setShowTxModal(false);
-      setTxForm({ quantity: 1, note: '' });
-      // Reload tồn kho và lịch sử giao dịch
-      if (selectedProductId) {
-        loadProductDetail(Number(selectedProductId));
-      }
-      loadTransactions();
-    } catch (err: any) {
-      setTxError(err?.response?.data?.message ?? err?.message ?? 'Lỗi khi thực hiện giao dịch kho.');
+      showToast(`${txType === 'IMPORT' ? 'Nhập lô hàng vào' : 'Xuất'} kho thành công.`, 'success');
+      await Promise.all([
+        loadVariants(),
+        loadSummary(),
+        detailVariant?.id === transactionTarget.id
+          ? Promise.all([loadDetailTransactions(transactionTarget.id), loadDetailBatches(transactionTarget.id)])
+          : Promise.resolve(),
+      ]);
+    } catch (error) {
+      setTxError(getErrorMessage(error, 'Không thể thực hiện giao dịch kho.'));
     } finally {
       setSubmittingTx(false);
     }
   };
 
-  // Mở modal giao dịch nhanh
-  const openTxModal = (
-    type: TransactionType,
-    v: { id: number; sku: string; color: string; size: string; stock: number }
-  ) => {
-    setTxType(type);
-    setSelectedVariant(v);
-    setTxError('');
-    setTxForm({ quantity: 1, note: '' });
-    setShowTxModal(true);
+  const handleUpdateThreshold = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!detailVariant) return;
+    const normalized = Math.max(0, Math.floor(Number(thresholdInput)));
+    if (normalized === detailVariant.safetyStockThreshold) return;
+    setSavingThreshold(true);
+    try {
+      const updated = await AdminInventoryService.updateSafetyStockThreshold(detailVariant.id, normalized);
+      setDetailVariant(updated);
+      setVariants((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      showToast('Đã cập nhật ngưỡng tồn kho an toàn.', 'success');
+      await loadSummary();
+    } catch (error) {
+      showToast(getErrorMessage(error, 'Không thể cập nhật ngưỡng an toàn.'), 'error');
+    } finally {
+      setSavingThreshold(false);
+    }
+  };
+
+  const handleCreateVariant = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedProductId) {
+      setVariantError('Vui lòng chọn sản phẩm.');
+      return;
+    }
+    if (!variantForm.sku.trim() || !variantForm.color.trim() || !variantForm.size) {
+      setVariantError('Vui lòng nhập đầy đủ SKU, màu sắc và kích thước.');
+      return;
+    }
+    setSubmittingVariant(true);
+    setVariantError('');
+    try {
+      await AdminInventoryService.createVariant(Number(selectedProductId), {
+        sku: variantForm.sku.trim(),
+        color: variantForm.color.trim(),
+        size: variantForm.size,
+        priceAdjustment: variantForm.priceAdjustment,
+      });
+      setShowVariantModal(false);
+      setVariantForm({ color: '', size: '', sku: '', priceAdjustment: 0 });
+      setSelectedProductId('');
+      setSelectedProduct(null);
+      showToast('Tạo biến thể mới thành công.', 'success');
+      await Promise.all([loadVariants(), loadSummary()]);
+    } catch (error) {
+      setVariantError(getErrorMessage(error, 'Không thể tạo biến thể mới.'));
+    } finally {
+      setSubmittingVariant(false);
+    }
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Toast Notification */}
+    <div className="space-y-4 pb-10">
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm text-white transition-all duration-300
-          ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
-          {toast.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-          <span>{toast.message}</span>
+        <div className={`fixed right-4 top-4 z-[70] flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold text-white shadow-lg ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+          {toast.type === 'success' ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+          {toast.message}
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">Quản lý Kho hàng</h1>
-          <p className="text-sm text-zinc-500 mt-1">Lập phiếu Nhập / Xuất kho, theo dõi lịch sử luân chuyển và quản lý biến thể sản phẩm.</p>
-        </div>
-      </div>
-
-      {/* Section 1: Selector & Variants List */}
-      <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden p-6">
-        <div className="max-w-md space-y-2 mb-6">
-          <label className="block text-sm font-semibold text-zinc-800">
-            Bước 1: Chọn sản phẩm để xem biến thể & quản lý kho
-          </label>
-          <div className="relative">
-            <select
-              value={selectedProductId}
-              onChange={(e) => {
-                setSelectedProductId(e.target.value ? Number(e.target.value) : '');
-                setTxPage(0);
+      <AdminPageHeader
+        title="Tồn kho & Biến thể"
+        description="Quản lý hiện trạng tồn kho 3 tầng theo SKU (On-hand, Reserved, Available), hạn mức an toàn và phiếu điều chỉnh kho."
+        actions={(
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                void loadVariants();
+                void loadSummary();
               }}
-              disabled={loadingProducts}
-              className="w-full pl-3 pr-10 py-2.5 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-950 bg-white"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
             >
-              <option value="">-- Vui lòng chọn một sản phẩm --</option>
-              {productList.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} (#{p.id})
-                </option>
-              ))}
-            </select>
-            {loadingProducts && (
-              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-zinc-400" />
-            )}
-          </div>
-        </div>
-
-        {selectedProduct ? (
-          <div className="border-t border-zinc-100 pt-6 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-lg bg-zinc-50 border border-zinc-200 overflow-hidden shrink-0 flex items-center justify-center">
-                  {selectedProduct.images && selectedProduct.images.length > 0 ? (
-                    <img
-                      src={selectedProduct.images.find((i) => i.isPrimary)?.imageUrl ?? selectedProduct.images[0].imageUrl}
-                      alt={selectedProduct.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <ImageIcon className="w-5 h-5 text-zinc-300" />
-                  )}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-zinc-900 text-lg">{selectedProduct.name}</h3>
-                  <div className="text-xs text-zinc-400">
-                    Thương hiệu: <span className="font-medium text-zinc-600">{selectedProduct.brand?.name ?? '—'}</span> | 
-                    Danh mục: <span className="font-medium text-zinc-600">{selectedProduct.category?.name ?? '—'}</span>
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setVariantError('');
-                  setShowVariantModal(true);
-                }}
-                className="flex items-center gap-1.5 px-4 py-2 bg-zinc-900 text-white text-xs font-semibold rounded-lg hover:bg-zinc-800 transition"
-              >
-                <Plus className="w-4 h-4" /> Thêm biến thể mới
-              </button>
-            </div>
-
-            {/* Bảng biến thể */}
-            <div className="overflow-x-auto border border-zinc-200 rounded-lg">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-zinc-50 text-zinc-500 border-b border-zinc-200 text-xs uppercase font-semibold">
-                  <tr>
-                    <th className="px-5 py-3">Mã SKU</th>
-                    <th className="px-5 py-3">Màu sắc</th>
-                    <th className="px-5 py-3">Kích cỡ</th>
-                    <th className="px-5 py-3 text-right">Chênh lệch giá</th>
-                    <th className="px-5 py-3 text-right">Tồn kho hiện tại</th>
-                    <th className="px-5 py-3 text-center">Thao tác kho</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
-                  {loadingDetail ? (
-                    <tr>
-                      <td colSpan={6} className="px-5 py-10 text-center text-zinc-400">
-                        <Loader2 className="w-5 h-5 animate-spin inline mr-2" /> Đang tải thông tin biến thể...
-                      </td>
-                    </tr>
-                  ) : !selectedProduct.variants || selectedProduct.variants.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-5 py-10 text-center text-zinc-400">
-                        Sản phẩm này chưa có biến thể nào. Hãy tạo biến thể mới ở trên.
-                      </td>
-                    </tr>
-                  ) : (
-                    selectedProduct.variants.map((v) => (
-                      <tr key={v.id} className="hover:bg-zinc-50 transition-colors">
-                        <td className="px-5 py-4 font-mono text-xs text-zinc-600">{v.sku || '—'}</td>
-                        <td className="px-5 py-4 text-zinc-900 font-medium">{v.color ?? '—'}</td>
-                        <td className="px-5 py-4 font-medium text-zinc-700">{v.size ?? '—'}</td>
-                        <td className="px-5 py-4 text-right text-zinc-500 font-mono">
-                          +{formatPrice(v.priceMultiplier)}
-                        </td>
-                        <td className="px-5 py-4 text-right">
-                          <span className={`font-semibold px-2 py-0.5 rounded text-xs
-                            ${(v.stock ?? 0) === 0 ? 'bg-red-50 text-red-700' : (v.stock ?? 0) < 10 ? 'bg-orange-50 text-orange-700' : 'bg-green-50 text-green-700'}`}>
-                            {v.stock ?? 0} chiếc
-                          </span>
-                        </td>
-                        <td className="px-5 py-4">
-                          <div className="flex gap-2 justify-center">
-                            <button
-                              onClick={() => openTxModal('IMPORT', { id: v.id, sku: v.sku, color: v.color, size: v.size, stock: v.stock })}
-                              className="flex items-center gap-1 px-2.5 py-1 border border-green-200 text-green-700 hover:bg-green-50 transition text-xs font-semibold rounded"
-                            >
-                              <ArrowUpRight className="w-3.5 h-3.5" /> Nhập kho
-                            </button>
-                            <button
-                              onClick={() => openTxModal('EXPORT', { id: v.id, sku: v.sku, color: v.color, size: v.size, stock: v.stock })}
-                              className="flex items-center gap-1 px-2.5 py-1 border border-red-200 text-red-700 hover:bg-red-50 transition text-xs font-semibold rounded"
-                            >
-                              <ArrowDownLeft className="w-3.5 h-3.5" /> Xuất kho
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : (
-          <div className="border border-dashed border-zinc-200 rounded-lg p-10 text-center text-zinc-400 mt-6 bg-zinc-50/50">
-            <Search className="w-8 h-8 text-zinc-300 mx-auto mb-2" />
-            <p className="text-sm font-medium">Chưa có sản phẩm nào được chọn.</p>
-            <p className="text-xs text-zinc-400 mt-0.5">Vui lòng chọn một sản phẩm phía trên để bắt đầu thao tác với biến thể và tồn kho.</p>
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Làm mới
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setVariantError('');
+                setShowVariantModal(true);
+              }}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-xs font-bold text-white transition hover:bg-slate-800"
+            >
+              <Plus className="h-4 w-4" /> Thêm biến thể
+            </button>
           </div>
         )}
+      />
+
+      <div className="grid min-w-0 gap-3 2xl:grid-cols-[minmax(0,1fr)_340px] 2xl:items-start">
+      <div className="min-w-0 space-y-3">
+      <div className="z-30 -mx-1 bg-slate-50 px-1 pb-2 2xl:sticky 2xl:-top-5">
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <AdminFilterHeader
+            isOpen={filtersOpen}
+            onToggle={() => setFiltersOpen((open) => !open)}
+            activeCount={activeFilterCount}
+            onReset={clearFilters}
+          />
+
+          {filtersOpen && (
+            <form onSubmit={applyFilters} className="space-y-3 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row">
+                <label className="relative min-w-0 flex-1">
+                  <span className="sr-only">Tìm biến thể</span>
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm SKU, tên sản phẩm hoặc thương hiệu..." className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-100" />
+                </label>
+                <button type="submit" className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-bold text-white hover:bg-slate-800">
+                  <Search className="h-4 w-4" /> Áp dụng
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <label className="space-y-1.5">
+                  <span className="text-xs font-bold text-slate-500">Thương hiệu</span>
+                  <select value={draftFilters.brandId} onChange={(event) => updateBrand(event.target.value)} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-slate-400">
+                    <option value="">Tất cả</option>
+                    {availableBrands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
+                  </select>
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-bold text-slate-500">Danh mục</span>
+                  <select value={draftFilters.categoryId} onChange={(event) => updateCategory(event.target.value)} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-slate-400">
+                    <option value="">Tất cả</option>
+                    {availableCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                  </select>
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-bold text-slate-500">Dòng sản phẩm</span>
+                  <select disabled={availableSilhouettes.length === 0} value={draftFilters.silhouetteId} onChange={(event) => setDraftFilters((current) => ({ ...current, silhouetteId: event.target.value }))} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-slate-400 disabled:bg-slate-50 disabled:text-slate-400">
+                    <option value="">{availableSilhouettes.length === 0 ? 'Không áp dụng' : 'Tất cả'}</option>
+                    {availableSilhouettes.map((silhouette) => <option key={silhouette.id} value={silhouette.id}>{silhouette.name}</option>)}
+                  </select>
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-bold text-slate-500">Tình trạng kho</span>
+                  <select value={draftFilters.stockStatus} onChange={(event) => setDraftFilters((current) => ({ ...current, stockStatus: event.target.value as InventoryFilters['stockStatus'] }))} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-slate-400">
+                    <option value="">Tất cả</option>
+                    <option value="IN_STOCK">Còn nhiều</option>
+                    <option value="LOW_STOCK">Sắp hết hàng</option>
+                    <option value="OUT_OF_STOCK">Hết hàng</option>
+                    <option value="INACTIVE">Ngừng kinh doanh</option>
+                  </select>
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-bold text-slate-500">Sắp xếp</span>
+                  <select value={sort} onChange={(event) => { setSort(event.target.value); setPage(0); }} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-slate-400">
+                    <option value="createdAt-desc">Mới nhất</option>
+                    <option value="stockQuantity-asc">Tồn kho tăng dần</option>
+                    <option value="stockQuantity-desc">Tồn kho giảm dần</option>
+                    <option value="sku-asc">SKU A–Z</option>
+                  </select>
+                </label>
+              </div>
+            </form>
+          )}
+        </section>
       </div>
 
-      {/* Section 2: Inventory History Logs */}
-      <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden p-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <div>
-            <h2 className="text-lg font-bold text-zinc-900">Lịch sử xuất nhập kho</h2>
-            <p className="text-xs text-zinc-400 mt-0.5">Theo dõi lịch sử luân chuyển hàng hóa thực tế.</p>
-          </div>
-
-          {/* Filters */}
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Loại giao dịch */}
-            <select
-              value={filterType}
-              onChange={(e) => {
-                setFilterType(e.target.value as any);
-                setTxPage(0);
-              }}
-              className="px-3 py-1.5 text-xs border border-zinc-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-950"
-            >
-              <option value="ALL">Tất cả giao dịch</option>
-              <option value="IMPORT">Nhập kho (IMPORT)</option>
-              <option value="EXPORT">Xuất kho (EXPORT)</option>
-            </select>
-
-            {/* Date filter */}
-            <div className="flex items-center gap-1.5 border border-zinc-200 px-3 py-1.5 rounded text-xs bg-white">
-              <Calendar className="w-3.5 h-3.5 text-zinc-400" />
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => {
-                  setStartDate(e.target.value);
-                  setTxPage(0);
-                }}
-                className="focus:outline-none text-zinc-600 bg-transparent"
-              />
-              <span className="text-zinc-300">đến</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => {
-                  setEndDate(e.target.value);
-                  setTxPage(0);
-                }}
-                className="focus:outline-none text-zinc-600 bg-transparent"
-              />
-            </div>
+      <section className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-x-auto border-b border-slate-200 px-4 pb-1 pt-3 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-track]:bg-slate-100">
+          <div className="flex min-w-max gap-1">
+            {statusTabs.map((tab) => (
+              <button key={tab.value || 'all'} type="button" onClick={() => selectStatus(tab.value)} className={`rounded-t-lg border-b-2 px-4 py-2.5 text-xs font-black transition ${appliedFilters.stockStatus === tab.value ? 'border-slate-950 bg-slate-950 text-white' : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
+                {tab.label} <span className={`ml-1 ${appliedFilters.stockStatus === tab.value ? 'text-slate-300' : 'text-slate-400'}`}>({tab.count.toLocaleString('vi-VN')})</span>
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Table Lịch sử */}
-        <div className="overflow-x-auto border border-zinc-200 rounded-lg">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-zinc-50 text-zinc-500 border-b border-zinc-200 text-xs uppercase font-semibold">
+        <header className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div>
+              <h2 className="text-sm font-black text-slate-950">Danh sách biến thể</h2>
+              <p className="mt-0.5 text-xs text-slate-500">{totalElements.toLocaleString('vi-VN')} SKU phù hợp bộ lọc</p>
+            </div>
+            {scopedProductId && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                Đang lọc theo Sản phẩm #{scopedProductId}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScopedProductId(undefined);
+                    setPage(0);
+                    const nextParams = new URLSearchParams(searchParams);
+                    nextParams.delete('productId');
+                    nextParams.delete('variantId');
+                    setSearchParams(nextParams, { replace: true });
+                  }}
+                  className="rounded-full p-0.5 text-blue-600 hover:bg-blue-100 hover:text-blue-900"
+                  aria-label="Bỏ lọc theo sản phẩm"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            )}
+          </div>
+          <select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(0); }} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none">
+            <option value={10}>10 / trang</option>
+            <option value={20}>20 / trang</option>
+            <option value={50}>50 / trang</option>
+          </select>
+        </header>
+
+        <div className="hidden overflow-x-auto lg:block">
+          <table className="w-full min-w-[820px] table-fixed text-left text-xs">
+            <colgroup>
+              <col className="w-[14%]" /><col className="w-[23%]" /><col className="w-[9%]" />
+              <col className="w-[10%]" /><col className="w-[11%]" /><col className="w-[11%]" />
+              <col className="w-[8%]" /><col className="w-[14%]" />
+            </colgroup>
+            <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-black uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-5 py-3">Mã GD / Thời gian</th>
-                <th className="px-5 py-3">Sản phẩm</th>
-                <th className="px-5 py-3">Biến thể (Màu/Size)</th>
-                <th className="px-5 py-3">Mã SKU</th>
-                <th className="px-5 py-3 text-center">Giao dịch</th>
-                <th className="px-5 py-3 text-right">Số lượng</th>
-                <th className="px-5 py-3">Lý do / Ghi chú</th>
+                <th className="px-3 py-3">SKU</th><th className="px-3 py-3">Sản phẩm</th><th className="px-3 py-3">Thương hiệu</th>
+                <th className="px-3 py-3">Danh mục</th><th className="px-3 py-3">Dòng sản phẩm</th><th className="px-3 py-3">Thuộc tính</th>
+                <th className="px-3 py-3 text-right">Tồn kho</th><th className="px-3 py-3">Trạng thái</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {loadingTx ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-zinc-400">
-                    <Loader2 className="w-5 h-5 animate-spin inline mr-2" /> Đang tải lịch sử giao dịch...
-                  </td>
-                </tr>
-              ) : transactions.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-zinc-400">
-                    Không tìm thấy dữ liệu lịch sử xuất nhập kho nào phù hợp bộ lọc.
-                  </td>
-                </tr>
-              ) : (
-                transactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-zinc-50 transition-colors">
-                    <td className="px-5 py-4">
-                      <div className="font-medium text-zinc-900">GD-{tx.id}</div>
-                      <div className="text-[10px] text-zinc-400">
-                        {new Date(tx.createdAt).toLocaleString('vi-VN')}
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="font-semibold text-zinc-800 line-clamp-1 max-w-[180px]">{tx.productName}</div>
-                    </td>
-                    <td className="px-5 py-4 text-zinc-600">
-                      {tx.color} / Size {tx.size}
-                    </td>
-                    <td className="px-5 py-4 font-mono text-xs text-zinc-500">{tx.sku}</td>
-                    <td className="px-5 py-4 text-center">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold
-                        ${tx.type === 'IMPORT' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                        {tx.type === 'IMPORT' ? (
-                          <>
-                            <ArrowUpRight className="w-3 h-3" /> Nhập kho
-                          </>
-                        ) : (
-                          <>
-                            <ArrowDownLeft className="w-3 h-3" /> Xuất kho
-                          </>
-                        )}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 text-right font-mono font-bold text-zinc-800">
-                      {tx.quantity} chiếc
-                    </td>
-                    <td className="px-5 py-4 text-zinc-500 text-xs italic">{tx.note ?? '—'}</td>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                <tr><td colSpan={8} className="px-3 py-16 text-center text-sm text-slate-500"><Loader2 className="mr-2 inline h-5 w-5 animate-spin" />Đang tải biến thể...</td></tr>
+              ) : variants.length === 0 ? (
+                <tr><td colSpan={8} className="px-3 py-16 text-center"><Search className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 font-bold text-slate-700">Không tìm thấy biến thể phù hợp</p><p className="mt-1 text-xs text-slate-400">Hãy điều chỉnh từ khóa hoặc đặt lại bộ lọc.</p></td></tr>
+              ) : variants.map((variant) => {
+                const status = getVariantStatus(variant);
+                return (
+                  <tr key={variant.id} onClick={() => setDetailVariant(variant)} className={`cursor-pointer transition hover:bg-blue-50/40 ${detailVariant?.id === variant.id ? 'bg-blue-50/60' : ''}`}>
+                    <td className="px-3 py-3 font-mono text-xs font-bold text-blue-600">{variant.sku}</td>
+                    <td className="px-3 py-3"><div className="flex min-w-0 items-center gap-2.5"><div className="flex h-11 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">{variant.productImageUrl ? <img src={variant.productImageUrl} alt="" className="h-full w-full object-contain p-1" /> : <ImageIcon className="h-5 w-5 text-slate-300" />}</div><div className="min-w-0"><p className="truncate font-bold text-slate-900">{variant.productName}</p><p className="truncate text-xs text-slate-400">#{variant.productId}</p></div></div></td>
+                    <td className="truncate px-3 py-3 text-slate-600">{variant.brandName ?? '—'}</td>
+                    <td className="truncate px-3 py-3 text-slate-600">{variant.categoryName ?? '—'}</td>
+                    <td className="truncate px-3 py-3 text-slate-600">{variant.silhouetteName ?? 'Không áp dụng'}</td>
+                    <td className="px-3 py-3 text-slate-700"><span className="font-semibold">{variant.color}</span><span className="text-slate-400"> / {variant.size}</span></td>
+                    <td className={`px-3 py-3 text-right font-black ${variant.stock === 0 ? 'text-red-600' : variant.stock <= variant.safetyStockThreshold ? 'text-amber-600' : 'text-emerald-600'}`}>{variant.stock}</td>
+                    <td className="px-3 py-3"><span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-black ${status.className}`}>{status.label}</span></td>
                   </tr>
-                ))
-              )}
+                );
+              })}
             </tbody>
           </table>
         </div>
 
-        {/* Pagination Lịch sử */}
-        {txTotalPages > 1 && (
-          <div className="px-5 py-3 border-t border-zinc-100 flex items-center justify-between mt-4">
-            <span className="text-sm text-zinc-500">Trang {txPage + 1} / {txTotalPages}</span>
-            <div className="flex gap-1.5">
-              <button
-                disabled={txPage === 0}
-                onClick={() => setTxPage((p) => p - 1)}
-                className="p-1.5 rounded border border-zinc-200 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
-              >
-                <ChevronLeft className="w-4 h-4" />
+        <div className="divide-y divide-slate-100 lg:hidden">
+          {loading ? <div className="py-14 text-center text-sm text-slate-500"><Loader2 className="mr-2 inline h-5 w-5 animate-spin" />Đang tải biến thể...</div> : variants.map((variant) => {
+            const status = getVariantStatus(variant);
+            return (
+              <button key={variant.id} type="button" onClick={() => setDetailVariant(variant)} className="flex w-full gap-3 p-4 text-left hover:bg-slate-50">
+                <div className="flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">{variant.productImageUrl ? <img src={variant.productImageUrl} alt="" className="h-full w-full object-contain p-1" /> : <ImageIcon className="h-5 w-5 text-slate-300" />}</div>
+                <div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate font-bold text-slate-900">{variant.productName}</p><p className="mt-1 font-mono text-xs font-bold text-blue-600">{variant.sku}</p></div><span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-black ${status.className}`}>{status.label}</span></div><p className="mt-2 text-xs text-slate-500">{variant.color} / {variant.size} · {variant.brandName ?? '—'}</p><p className="mt-1 text-xs font-black text-slate-700">Tồn kho: <span className="text-slate-950">{variant.stock}</span> · Ngưỡng: {variant.safetyStockThreshold}</p></div>
               </button>
-              <button
-                disabled={txPage + 1 >= txTotalPages}
-                onClick={() => setTxPage((p) => p + 1)}
-                className="p-1.5 rounded border border-zinc-200 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+            );
+          })}
+        </div>
+
+        <AdminPagination
+          page={page}
+          totalPages={totalPages}
+          totalElements={totalElements}
+          pageSize={pageSize}
+          visibleCount={variants.length}
+          itemLabel="biến thể"
+          disabled={loading}
+          onPageChange={setPage}
+        />
+      </section>
+      </div>
+      {detailVariant ? (
+        <AdminDetailPanel ariaLabel={`Chi tiết biến thể ${detailVariant.sku}`} className="flex flex-col">
+          <section aria-labelledby="variant-detail-title" className="flex min-h-0 flex-1 flex-col">
+            <header className="flex h-11 items-center justify-between border-b border-slate-200 px-4"><h2 id="variant-detail-title" className="text-sm font-black text-slate-950">Chi tiết biến thể & lô</h2><button type="button" onClick={() => setDetailVariant(null)} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-900" aria-label="Đóng"><X className="h-4 w-4" /></button></header>
+            <nav className="grid grid-cols-4 border-b border-slate-200 bg-slate-50/60 px-2">
+              {([
+                ['info', 'Thông tin'],
+                ['stock', 'Tồn kho'],
+                ['batches', `Lô (${detailBatches.length})`],
+                ['history', `Lịch sử (${detailTransactions.length})`],
+              ] as const).map(([value, label]) => (
+                <button key={value} type="button" onClick={() => setDetailTab(value)} title={label} className={`min-w-0 truncate whitespace-nowrap border-b-2 px-1 py-2.5 text-[10px] font-bold ${detailTab === value ? 'border-slate-950 text-slate-950' : 'border-transparent text-slate-500'}`}>
+                  {label}
+                </button>
+              ))}
+            </nav>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+              {detailTab === 'info' && (
+                <div className="grid gap-4">
+                  <div>
+                    <div className="flex aspect-[16/9] items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                      {detailVariant.productImageUrl ? <img src={detailVariant.productImageUrl} alt={detailVariant.productName} className="h-full w-full object-contain p-3" /> : <ImageIcon className="h-10 w-10 text-slate-300" />}
+                    </div>
+                    <h3 className="mt-3 text-base font-black leading-6 text-slate-950">{detailVariant.productName}</h3>
+                    <a href={`/products/${detailVariant.productId}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50">
+                      Xem sản phẩm <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="max-w-full truncate rounded-md bg-slate-100 px-2.5 py-1 font-mono text-xs font-black text-slate-700">{detailVariant.sku}</span>
+                      <span className={`rounded-full border px-2.5 py-1 text-[11px] font-black ${getVariantStatus(detailVariant).className}`}>{getVariantStatus(detailVariant).label}</span>
+                    </div>
+                    <div className="mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-3 gap-y-4 text-sm">
+                      {[
+                        ['Thương hiệu', detailVariant.brandName ?? '—'],
+                        ['Danh mục', detailVariant.categoryName ?? '—'],
+                        ['Dòng sản phẩm', detailVariant.silhouetteName ?? 'Không áp dụng'],
+                        ['Màu sắc', detailVariant.color],
+                        ['Kích thước', detailVariant.size],
+                        ['Giá bán', formatPrice(detailVariant.finalPrice)],
+                        ['Chênh lệch giá', formatPrice(detailVariant.priceAdjustment)],
+                        ['Ngày tạo', new Date(detailVariant.createdAt).toLocaleDateString('vi-VN')],
+                      ].map(([label, value]) => <div key={label} className="min-w-0"><p className="text-xs font-bold text-slate-400">{label}</p><p className="mt-1 break-words font-bold leading-5 text-slate-900">{value}</p></div>)}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {detailTab === 'stock' && (
+                <div className="space-y-4">
+                  <header className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white">
+                      {detailVariant.productImageUrl ? <img src={detailVariant.productImageUrl} alt="" className="h-full w-full object-contain p-1.5" /> : <ImageIcon className="h-6 w-6 text-slate-300" />}
+                    </div>
+                    <div className="min-w-0"><p className="truncate text-sm font-black text-slate-950">{detailVariant.productName}</p><p className="mt-1 truncate font-mono text-[11px] font-bold text-blue-600">{detailVariant.sku}</p><p className="mt-1 truncate text-xs text-slate-500">{detailVariant.color} / {detailVariant.size}</p></div>
+                  </header>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <article className="rounded-xl border border-slate-200 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Tồn hiện tại</p><p className={`mt-2 text-2xl font-black ${detailVariant.stock === 0 ? 'text-red-600' : 'text-slate-950'}`}>{detailVariant.stock}</p><p className="mt-1 text-xs text-slate-500">sản phẩm</p></article>
+                    <form onSubmit={handleUpdateThreshold} className="rounded-xl border border-slate-200 p-3">
+                      <label htmlFor="safety-stock-threshold" className="block text-[11px] font-bold uppercase tracking-wide text-slate-400">Ngưỡng an toàn</label>
+                      <div className="mt-2 flex items-center gap-1.5">
+                        <input
+                          id="safety-stock-threshold"
+                          type="number"
+                          min={0}
+                          value={thresholdInput}
+                          onChange={(event) => setThresholdInput(Math.max(0, Number(event.target.value)))}
+                          className="h-8 w-full min-w-0 rounded-lg border border-slate-200 px-2 text-lg font-black text-slate-950 outline-none focus:border-slate-400"
+                        />
+                        {thresholdInput !== detailVariant.safetyStockThreshold && (
+                          <button
+                            type="submit"
+                            disabled={savingThreshold}
+                            className="h-8 shrink-0 rounded-lg bg-slate-950 px-2.5 text-[11px] font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+                          >
+                            {savingThreshold ? '...' : 'Lưu'}
+                          </button>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">cảnh báo sắp hết</p>
+                    </form>
+                  </div>
+
+                  <section className="rounded-xl border border-slate-200 p-4">
+                    <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold text-slate-500">Tình trạng tồn kho</p><p className="mt-1 text-sm font-black text-slate-950">{getVariantStatus(detailVariant).label}</p></div><span className={`rounded-full border px-2.5 py-1 text-[11px] font-black ${getVariantStatus(detailVariant).className}`}>{detailVariant.stock - detailVariant.safetyStockThreshold >= 0 ? `+${detailVariant.stock - detailVariant.safetyStockThreshold}` : detailVariant.stock - detailVariant.safetyStockThreshold}</span></div>
+                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${detailVariant.stock === 0 ? 'bg-red-500' : detailVariant.stock <= detailVariant.safetyStockThreshold ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min(100, detailVariant.safetyStockThreshold > 0 ? (detailVariant.stock / (detailVariant.safetyStockThreshold * 2)) * 100 : 100)}%` }} /></div>
+                    <p className="mt-3 text-xs leading-5 text-slate-500">{detailVariant.productInactive ? 'Sản phẩm đang ngừng kinh doanh; không thể thực hiện nhập hoặc xuất kho.' : detailVariant.stock === 0 ? 'Biến thể đã hết hàng và cần được nhập bổ sung.' : detailVariant.stock <= detailVariant.safetyStockThreshold ? `Tồn kho đang bằng hoặc thấp hơn ngưỡng an toàn; nên nhập thêm ít nhất ${detailVariant.safetyStockThreshold * 2 - detailVariant.stock} sản phẩm.` : `Tồn kho đang cao hơn ngưỡng an toàn ${detailVariant.stock - detailVariant.safetyStockThreshold} sản phẩm.`}</p>
+                  </section>
+
+                  <section className="rounded-xl border border-slate-200 p-4">
+                    <div className="flex items-center gap-2"><History className="h-4 w-4 text-slate-500" /><h3 className="text-sm font-black text-slate-900">Biến động gần nhất</h3></div>
+                    {loadingDetailTransactions ? <div className="py-8 text-center text-xs text-slate-500"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Đang tải dữ liệu...</div> : <><div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-lg bg-emerald-50 p-3"><p className="text-[11px] font-bold text-emerald-700">Đã nhập</p><p className="mt-1 text-lg font-black text-emerald-800">+{recentMovement.imported}</p></div><div className="rounded-lg bg-red-50 p-3"><p className="text-[11px] font-bold text-red-700">Đã xuất</p><p className="mt-1 text-lg font-black text-red-800">-{recentMovement.exported}</p></div></div><p className="mt-2 text-[11px] leading-4 text-slate-400">Tổng hợp từ {detailTransactions.length} giao dịch gần nhất được tải.</p></>}
+                  </section>
+                </div>
+              )}
+
+              {detailTab === 'batches' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Quản lý lô FIFO</p>
+                      <p className="mt-0.5 text-xs font-bold text-slate-800">{detailBatches.length} lô nhập của SKU này</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={detailVariant.productInactive}
+                      onClick={() => openTransaction('IMPORT', detailVariant)}
+                      className="inline-flex h-8 items-center gap-1 rounded-lg bg-slate-950 px-2.5 text-[11px] font-bold text-white hover:bg-slate-800 disabled:opacity-40"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Nhập lô mới
+                    </button>
+                  </div>
+
+                  {loadingDetailBatches ? (
+                    <div className="py-10 text-center text-sm text-slate-500">
+                      <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Đang tải danh sách lô...
+                    </div>
+                  ) : detailBatches.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center">
+                      <Boxes className="mx-auto h-7 w-7 text-slate-300" />
+                      <p className="mt-2 text-xs font-bold text-slate-700">Chưa có chứng từ lô hàng</p>
+                      <p className="mt-1 text-[11px] text-slate-400">Các lần nhập kho tiếp theo sẽ tự động ghi nhận mã lô và giá vốn tại đây.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {detailBatches.map((batch) => {
+                        const ratio = batch.quantityImported > 0
+                          ? Math.min(100, Math.round((batch.quantityRemaining / batch.quantityImported) * 100))
+                          : 0;
+                        return (
+                          <article key={batch.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="truncate rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-black text-slate-800">
+                                {batch.batchCode}
+                              </span>
+                              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${
+                                batch.quantityRemaining > 0
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : 'bg-slate-100 text-slate-500'
+                              }`}>
+                                Còn {batch.quantityRemaining}/{batch.quantityImported}
+                              </span>
+                            </div>
+                            <p className="mt-2 truncate text-xs font-bold text-slate-800">{batch.supplierName}</p>
+                            <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">
+                              <span>Giá vốn: <strong className="text-slate-900">{formatPrice(batch.unitCost)}</strong></span>
+                              <span>{new Date(batch.receivedDate).toLocaleDateString('vi-VN')}</span>
+                            </div>
+                            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                              <div
+                                className={`h-full rounded-full ${batch.quantityRemaining > 0 ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                                style={{ width: `${ratio}%` }}
+                              />
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {detailTab === 'history' && (
+                <div className="overflow-hidden rounded-xl border border-slate-200">
+                  <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3"><History className="h-4 w-4 text-slate-500" /><h3 className="text-sm font-black text-slate-900">Lịch sử giao dịch kho</h3></div>
+                  {loadingDetailTransactions ? <div className="py-10 text-center text-sm text-slate-500"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Đang tải lịch sử...</div> : detailTransactions.length === 0 ? <div className="py-10 text-center text-sm text-slate-400">Chưa có giao dịch kho cho biến thể này.</div> : <div className="divide-y divide-slate-100">{detailTransactions.map((transaction) => <article key={transaction.id} className="p-3"><div className="flex items-center justify-between gap-3"><span className={`rounded-full px-2 py-1 text-[11px] font-black ${transaction.type === 'IMPORT' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{transaction.type === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'}</span><strong className={transaction.type === 'IMPORT' ? 'text-emerald-700' : 'text-red-700'}>{transaction.type === 'IMPORT' ? '+' : '-'}{transaction.quantity}</strong></div><p className="mt-2 text-xs leading-5 text-slate-600">{transaction.note || 'Không có ghi chú'}</p><time className="mt-1 block text-[11px] text-slate-400">{new Date(transaction.createdAt).toLocaleString('vi-VN')}</time></article>)}</div>}
+                </div>
+              )}
             </div>
-          </div>
-        )}
+            <footer className="grid shrink-0 grid-cols-2 gap-2 border-t border-slate-200 bg-white p-3"><button type="button" disabled={detailVariant.productInactive} onClick={() => openTransaction('EXPORT', detailVariant)} className="inline-flex h-10 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-red-200 px-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-40"><ArrowDownLeft className="h-4 w-4 shrink-0" /> Xuất kho</button><button type="button" disabled={detailVariant.productInactive} onClick={() => openTransaction('IMPORT', detailVariant)} className="inline-flex h-10 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-slate-950 px-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-40"><ArrowUpRight className="h-4 w-4 shrink-0" /> Nhập lô / Kho</button></footer>
+          </section>
+        </AdminDetailPanel>
+      ) : (
+        <AdminDetailPanel ariaLabel="Chưa chọn biến thể">
+          <AdminDetailEmptyState
+            icon={<ImageIcon className="h-9 w-9" />}
+            title="Chưa chọn biến thể"
+            description="Chọn một biến thể trong danh sách để xem tồn kho, lô hàng FIFO và lịch sử giao dịch."
+            items={["Thuộc tính và giá bán", "Tồn kho và ngưỡng an toàn", "Chứng từ lô nhập & giá vốn FIFO"]}
+          />
+        </AdminDetailPanel>
+      )}
       </div>
 
-      {/* ===== MODAL: THÊM BIẾN THỂ MỚI ===== */}
-      {showVariantModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
-              <h3 className="text-lg font-bold text-zinc-950">Thêm biến thể mới</h3>
-              <button
-                onClick={() => setShowVariantModal(false)}
-                className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateVariant} className="p-6 space-y-4">
-              {variantError && (
-                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{variantError}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 mb-1">Mã SKU biến thể *</label>
-                <input
-                  type="text" required
-                  value={variantForm.sku}
-                  onChange={(e) => setVariantForm({ ...variantForm, sku: e.target.value })}
-                  placeholder="Ví dụ: NKE-AJ1-RED-42"
-                  className="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-950 font-mono"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-700 mb-1">Màu sắc *</label>
-                  <input
-                    type="text" required
-                    value={variantForm.color}
-                    onChange={(e) => setVariantForm({ ...variantForm, color: e.target.value })}
-                    placeholder="Ví dụ: Đen/Đỏ"
-                    className="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-950"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-700 mb-1">Kích cỡ (Size) *</label>
-                  <input
-                    type="text" required
-                    value={variantForm.size}
-                    onChange={(e) => setVariantForm({ ...variantForm, size: e.target.value })}
-                    placeholder="Ví dụ: 42"
-                    className="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-950"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 mb-1">Chênh lệch giá với giá gốc (VND)</label>
-                <input
-                  type="number"
-                  value={variantForm.priceAdjustment || 0}
-                  onChange={(e) => setVariantForm({ ...variantForm, priceAdjustment: Number(e.target.value) })}
-                  placeholder="Ví dụ: 100000"
-                  className="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-950"
-                />
-                <span className="text-[10px] text-zinc-400 mt-1 block">Tồn kho ban đầu của biến thể mặc định là 0. Bạn cần lập phiếu Nhập kho để bổ sung số lượng.</span>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-zinc-100">
-                <button
-                  type="button"
-                  onClick={() => setShowVariantModal(false)}
-                  disabled={submittingVariant}
-                  className="px-4 py-2 text-xs font-semibold text-zinc-600 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 transition disabled:opacity-50"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingVariant}
-                  className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white bg-zinc-900 rounded-lg hover:bg-zinc-800 transition disabled:opacity-50"
-                >
-                  {submittingVariant && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  Tạo biến thể
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {showVariantModal && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/55 p-4 backdrop-blur-sm"><section role="dialog" aria-modal="true" className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl"><header className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><div><p className="text-xs font-black uppercase tracking-wide text-slate-400">Catalog</p><h2 className="mt-1 text-lg font-black text-slate-950">Thêm biến thể mới</h2></div><button type="button" onClick={() => setShowVariantModal(false)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button></header><form onSubmit={handleCreateVariant} className="space-y-4 p-5">{variantError && <div className="flex gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700"><AlertCircle className="h-4 w-4 shrink-0" />{variantError}</div>}<label className="block space-y-1.5"><span className="text-xs font-bold text-slate-600">Tìm sản phẩm</span><input value={productSearch} onChange={(event) => setProductSearch(event.target.value)} placeholder="Tên sản phẩm hoặc SKU..." className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-slate-400" /></label><label className="block space-y-1.5"><span className="text-xs font-bold text-slate-600">Sản phẩm *</span><div className="relative"><select value={selectedProductId} onChange={(event) => setSelectedProductId(event.target.value ? Number(event.target.value) : '')} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none"><option value="">Chọn sản phẩm</option>{productList.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select>{loadingProducts && <Loader2 className="absolute right-9 top-3 h-4 w-4 animate-spin text-slate-400" />}</div></label><div className="grid gap-4 sm:grid-cols-2"><label className="space-y-1.5"><span className="text-xs font-bold text-slate-600">SKU *</span><input value={variantForm.sku} onChange={(event) => setVariantForm((current) => ({ ...current, sku: event.target.value }))} className="h-10 w-full rounded-lg border border-slate-200 px-3 font-mono text-sm outline-none" /></label><label className="space-y-1.5"><span className="text-xs font-bold text-slate-600">Màu sắc *</span><input value={variantForm.color} onChange={(event) => setVariantForm((current) => ({ ...current, color: event.target.value }))} className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none" /></label><label className="space-y-1.5"><span className="text-xs font-bold text-slate-600">Kích thước *</span><select value={variantForm.size} onChange={(event) => setVariantForm((current) => ({ ...current, size: event.target.value }))} disabled={!selectedProduct} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none disabled:bg-slate-50"><option value="">Chọn kích thước</option>{variantSizeOptions.map((size) => <option key={size} value={size}>{size}</option>)}</select></label><label className="space-y-1.5"><span className="text-xs font-bold text-slate-600">Chênh lệch giá</span><input type="number" value={variantForm.priceAdjustment} onChange={(event) => setVariantForm((current) => ({ ...current, priceAdjustment: Number(event.target.value) }))} className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none" /></label></div><footer className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={() => setShowVariantModal(false)} className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700">Hủy</button><button type="submit" disabled={submittingVariant} className="inline-flex h-10 items-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:opacity-50">{submittingVariant && <Loader2 className="h-4 w-4 animate-spin" />}Tạo biến thể</button></footer></form></section></div>,
+        document.body,
       )}
 
-      {/* ===== MODAL: PHIẾU GIAO DỊCH KHO (NHẬP/XUẤT) ===== */}
-      {showTxModal && selectedVariant && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
-              <h3 className="text-lg font-bold text-zinc-950">
-                Lập phiếu {txType === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'}
-              </h3>
-              <button
-                onClick={() => setShowTxModal(false)}
-                className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition"
-              >
-                <X className="w-5 h-5" />
+      {showTxModal && transactionTarget && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/55 p-4 backdrop-blur-sm">
+          <section role="dialog" aria-modal="true" className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                  {txType === 'IMPORT' ? 'Nhập lô hàng vào kho (FIFO)' : 'Xuất kho / Kiểm kê'}
+                </p>
+                <h2 className="mt-1 text-lg font-black text-slate-950">
+                  {txType === 'IMPORT' ? 'Tạo phiếu nhập kho & Lô hàng' : 'Tạo phiếu xuất kho'}
+                </h2>
+              </div>
+              <button type="button" onClick={() => setShowTxModal(false)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100">
+                <X className="h-5 w-5" />
               </button>
-            </div>
-
-            <form onSubmit={handleCreateTransaction} className="p-6 space-y-4">
+            </header>
+            <form onSubmit={handleCreateTransaction} className="space-y-4 p-5">
               {txError && (
-                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{txError}</span>
+                <div className="flex gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  {txError}
+                </div>
+              )}
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                <p className="font-bold text-slate-900">{transactionTarget.productName}</p>
+                <p className="mt-1 font-mono text-xs text-blue-600">{transactionTarget.sku}</p>
+                <p className="mt-1.5 text-xs text-slate-500">
+                  {transactionTarget.color} / {transactionTarget.size} · Tồn hiện tại:{' '}
+                  <strong className="text-slate-900">{transactionTarget.stock}</strong> · Giá bán:{' '}
+                  <strong className="text-slate-900">{formatPrice(transactionTarget.finalPrice)}</strong>
+                </p>
+              </div>
+
+              {txType === 'IMPORT' && (
+                <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase tracking-wide text-slate-600">Chứng từ lô nhập</span>
+                    <button
+                      type="button"
+                      onClick={() => setTxForm((current) => ({ ...current, batchCode: generateSuggestedBatchCode(transactionTarget) }))}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" /> Tự sinh mã lô
+                    </button>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="space-y-1">
+                      <span className="text-xs font-bold text-slate-600">Mã lô (để trống sẽ tự sinh)</span>
+                      <input
+                        value={txForm.batchCode}
+                        onChange={(event) => setTxForm((current) => ({ ...current, batchCode: event.target.value }))}
+                        placeholder="VD: BATCH-NK-2026-01"
+                        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 font-mono text-xs outline-none focus:border-slate-400"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-xs font-bold text-slate-600">Nhà cung cấp *</span>
+                      <input
+                        value={txForm.supplierName}
+                        onChange={(event) => setTxForm((current) => ({ ...current, supplierName: event.target.value }))}
+                        placeholder="Tên nhà phân phối..."
+                        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs outline-none focus:border-slate-400"
+                      />
+                    </label>
+                  </div>
                 </div>
               )}
 
-              {/* Thông tin biến thể */}
-              <div className="bg-zinc-50 border border-zinc-100 rounded-lg p-3 text-xs space-y-1">
-                <div>Biến thể: <span className="font-semibold text-zinc-900">{selectedVariant.color} / Size {selectedVariant.size}</span></div>
-                <div>Mã SKU: <span className="font-mono text-zinc-600">{selectedVariant.sku}</span></div>
-                <div>Tồn kho hiện tại: <span className="font-semibold text-zinc-900">{selectedVariant.stock} chiếc</span></div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 mb-1">
-                  Số lượng cần {txType === 'IMPORT' ? 'nhập' : 'xuất'} *
+              <div className={`grid gap-3 ${txType === 'IMPORT' ? 'sm:grid-cols-2' : 'grid-cols-1'}`}>
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-bold text-slate-600">Số lượng {txType === 'IMPORT' ? 'nhập' : 'xuất'} *</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={txForm.quantity}
+                    onChange={(event) => setTxForm((current) => ({ ...current, quantity: Math.max(1, Number(event.target.value)) }))}
+                    className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-slate-400"
+                  />
                 </label>
-                <input
-                  type="number" required min={1}
-                  value={txForm.quantity}
-                  onChange={(e) => setTxForm({ ...txForm, quantity: Math.max(1, Number(e.target.value)) })}
-                  className="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-950 font-bold"
-                />
+                {txType === 'IMPORT' && (
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-bold text-slate-600">Giá vốn / đôi (VNĐ) *</span>
+                    <input
+                      type="number"
+                      min={1000}
+                      step={1000}
+                      value={txForm.unitCost}
+                      onChange={(event) => setTxForm((current) => ({ ...current, unitCost: Math.max(0, Number(event.target.value)) }))}
+                      className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-slate-400"
+                    />
+                  </label>
+                )}
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 mb-1">Lý do / Ghi chú</label>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-bold text-slate-600">Lý do / Ghi chú kiểm toán</span>
                 <textarea
                   rows={2}
                   value={txForm.note}
-                  onChange={(e) => setTxForm({ ...txForm, note: e.target.value })}
-                  placeholder="Ví dụ: Nhập hàng bổ sung từ nhà sản xuất, xuất hoàn trả hàng lỗi..."
-                  className="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-950 resize-none"
+                  onChange={(event) => setTxForm((current) => ({ ...current, note: event.target.value }))}
+                  placeholder={txType === 'IMPORT' ? 'Nhập hàng định kỳ từ nhà cung cấp...' : 'Xuất hủy hàng lỗi / điều chỉnh kiểm kê...'}
+                  className="w-full resize-none rounded-lg border border-slate-200 p-3 text-sm outline-none focus:border-slate-400"
                 />
-              </div>
+              </label>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-zinc-100">
-                <button
-                  type="button"
-                  onClick={() => setShowTxModal(false)}
-                  disabled={submittingTx}
-                  className="px-4 py-2 text-xs font-semibold text-zinc-600 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 transition disabled:opacity-50"
-                >
-                  Hủy bỏ
+              <footer className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+                <button type="button" onClick={() => setShowTxModal(false)} className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700">
+                  Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={submittingTx}
-                  className={`flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white rounded-lg transition disabled:opacity-50
-                    ${txType === 'IMPORT' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                  className={`inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold text-white disabled:opacity-50 ${
+                    txType === 'IMPORT' ? 'bg-slate-950 hover:bg-slate-800' : 'bg-red-600 hover:bg-red-700'
+                  }`}
                 >
-                  {submittingTx && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  Xác nhận {txType === 'IMPORT' ? 'nhập kho' : 'xuất kho'}
+                  {submittingTx && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {txType === 'IMPORT' ? 'Xác nhận nhập lô' : 'Xác nhận xuất kho'}
                 </button>
-              </div>
+              </footer>
             </form>
-          </div>
-        </div>
+          </section>
+        </div>,
+        document.body,
       )}
     </div>
   );
