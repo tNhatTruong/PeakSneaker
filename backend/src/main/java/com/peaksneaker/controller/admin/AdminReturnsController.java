@@ -6,6 +6,7 @@ import com.peaksneaker.dto.response.ApiResponse;
 import com.peaksneaker.dto.response.OrderReturnFilterOptionsResponse;
 import com.peaksneaker.dto.response.OrderReturnResponse;
 import com.peaksneaker.dto.response.PaginatedResponse;
+import com.peaksneaker.enums.PaymentMethod;
 import com.peaksneaker.enums.ReturnReasonCode;
 import com.peaksneaker.enums.ReturnStatus;
 import com.peaksneaker.enums.ReturnType;
@@ -26,7 +27,7 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("/api/v1/admin/returns")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_ADMIN', 'ADMIN', 'ROLE_WAREHOUSE', 'WAREHOUSE', 'ROLE_SUPPORT', 'SUPPORT', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER', 'ROLE_SALES', 'SALES')")
+@PreAuthorize("hasAnyAuthority('ORDER_RETURN_MANAGE', 'ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_ADMIN', 'ADMIN', 'ROLE_WAREHOUSE', 'WAREHOUSE', 'ROLE_SUPPORT', 'SUPPORT', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER', 'ROLE_SALES', 'SALES')")
 public class AdminReturnsController {
 
     private final OrderReturnService orderReturnService;
@@ -37,6 +38,7 @@ public class AdminReturnsController {
             @RequestParam(required = false) String query,
             @RequestParam(required = false) ReturnReasonCode reasonCode,
             @RequestParam(required = false) ReturnType returnType,
+            @RequestParam(required = false) PaymentMethod paymentMethod,
             @RequestParam(required = false) Long productId,
             @RequestParam(required = false) Long orderId,
             @RequestParam(required = false) LocalDate from,
@@ -49,6 +51,7 @@ public class AdminReturnsController {
                 .status(status)
                 .reasonCode(reasonCode)
                 .returnType(returnType)
+                .paymentMethod(paymentMethod)
                 .productId(productId)
                 .orderId(orderId)
                 .from(from)

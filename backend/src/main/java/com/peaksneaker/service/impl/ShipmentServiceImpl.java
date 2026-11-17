@@ -14,6 +14,7 @@ import com.peaksneaker.entity.Payment;
 import com.peaksneaker.entity.ProductVariant;
 import com.peaksneaker.entity.Shipment;
 import com.peaksneaker.entity.ShipmentEvent;
+import com.peaksneaker.entity.VoucherUsage;
 import com.peaksneaker.enums.InventoryChangeType;
 import com.peaksneaker.enums.OrderStatus;
 import com.peaksneaker.enums.PaymentMethod;
@@ -29,7 +30,9 @@ import com.peaksneaker.repository.ProductVariantRepository;
 import com.peaksneaker.repository.ShipmentEventRepository;
 import com.peaksneaker.repository.ShipmentRepository;
 import com.peaksneaker.repository.VoucherRepository;
+import com.peaksneaker.repository.VoucherUsageRepository;
 import com.peaksneaker.service.GhnService;
+import com.peaksneaker.service.InventoryService;
 import com.peaksneaker.service.ShipmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -55,6 +58,8 @@ public class ShipmentServiceImpl implements ShipmentService {
     private final ProductVariantRepository productVariantRepository;
     private final InventoryAuditLogRepository inventoryAuditLogRepository;
     private final VoucherRepository voucherRepository;
+    private final VoucherUsageRepository voucherUsageRepository;
+    private final InventoryService inventoryService;
     private final GhnService ghnService;
     private final ObjectMapper objectMapper;
 
@@ -234,6 +239,9 @@ public class ShipmentServiceImpl implements ShipmentService {
                     .orElseThrow(() -> new ResourceNotFoundException("Biến thể", "id", item.getProductVariant().getId()));
             variant.setStockQuantity(variant.getStockQuantity() + item.getQuantity());
             productVariantRepository.save(variant);
+            if (inventoryService != null) {
+                inventoryService.restoreBatchesFifo(variant.getId(), item.getQuantity());
+            }
             inventoryAuditLogRepository.save(InventoryAuditLog.builder()
                     .variant(variant)
                     .changeType(InventoryChangeType.RETURN)
@@ -246,6 +254,12 @@ public class ShipmentServiceImpl implements ShipmentService {
         if (shipment.getOrder().getVoucher() != null) {
             shipment.getOrder().getVoucher().decrementUsage();
             voucherRepository.save(shipment.getOrder().getVoucher());
+            if (voucherUsageRepository != null && shipment.getOrder().getId() != null) {
+                List<VoucherUsage> usages = voucherUsageRepository.findByOrderId(shipment.getOrder().getId());
+                if (usages != null && !usages.isEmpty()) {
+                    voucherUsageRepository.deleteAll(usages);
+                }
+            }
         }
         shipment.setRestockedAt(occurredAt);
     }

@@ -19,6 +19,7 @@ import com.peaksneaker.exception.ResourceNotFoundException;
 import com.peaksneaker.repository.*;
 import com.peaksneaker.repository.specification.OrderReturnSpecification;
 import com.peaksneaker.service.EmailService;
+import com.peaksneaker.service.InventoryService;
 import com.peaksneaker.service.OrderReturnService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +50,7 @@ public class OrderReturnServiceImpl implements OrderReturnService {
     private final ProductVariantRepository productVariantRepository;
     private final OrderReturnItemRepository orderReturnItemRepository;
     private final InventoryAuditLogRepository inventoryAuditLogRepository;
+    private final InventoryService inventoryService;
     private final EmailService emailService;
     private final ObjectMapper objectMapper;
 
@@ -373,27 +375,43 @@ public class OrderReturnServiceImpl implements OrderReturnService {
 
     private void restockAcceptedItems(OrderReturn orderReturn, String adminEmail) {
         for (OrderReturnItem returnItem : orderReturn.getItems()) {
-            if (returnItem.getRestockedAt() != null || returnItem.getRestockableQuantity() <= 0) continue;
+            if (returnItem.getRestockedAt() != null) continue;
 
-            ProductVariant originalVariant = returnItem.getOrderItem().getProductVariant();
-            if (originalVariant != null) {
-                ProductVariant lockedVariant = productVariantRepository.findByIdWithLock(originalVariant.getId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Biến thể", "id", originalVariant.getId()));
-                lockedVariant.increaseStock(returnItem.getRestockableQuantity());
-                productVariantRepository.save(lockedVariant);
-                saveInventoryAudit(lockedVariant, returnItem.getRestockableQuantity(), orderReturn, adminEmail, "Hoàn kho hàng đổi trả");
+            boolean hasAction = false;
+            int restockQty = returnItem.getRestockableQuantity() != null ? returnItem.getRestockableQuantity() : 0;
+            if (restockQty > 0) {
+                ProductVariant originalVariant = returnItem.getOrderItem().getProductVariant();
+                if (originalVariant != null) {
+                    ProductVariant lockedVariant = productVariantRepository.findByIdWithLock(originalVariant.getId())
+                            .orElseThrow(() -> new ResourceNotFoundException("Biến thể", "id", originalVariant.getId()));
+                    lockedVariant.increaseStock(restockQty);
+                    productVariantRepository.save(lockedVariant);
+                    if (inventoryService != null) {
+                        inventoryService.restoreBatchesFifo(lockedVariant.getId(), restockQty);
+                    }
+                    saveInventoryAudit(lockedVariant, restockQty, orderReturn, adminEmail, "Hoàn kho hàng đổi trả");
+                    hasAction = true;
+                }
             }
 
-            if (orderReturn.getReturnType() == ReturnType.EXCHANGE) {
+            int exchangeQty = returnItem.getReceivedQuantity() != null ? returnItem.getReceivedQuantity() : 0;
+            if (orderReturn.getReturnType() == ReturnType.EXCHANGE && exchangeQty > 0 && returnItem.getReplacementVariant() != null) {
                 ProductVariant replacement = productVariantRepository.findByIdWithLock(
                                 returnItem.getReplacementVariant().getId())
                         .orElseThrow(() -> new ResourceNotFoundException(
                                 "Biến thể thay thế", "id", returnItem.getReplacementVariant().getId()));
-                replacement.decreaseStock(returnItem.getReceivedQuantity());
+                replacement.decreaseStock(exchangeQty);
                 productVariantRepository.save(replacement);
-                saveInventoryAudit(replacement, -returnItem.getReceivedQuantity(), orderReturn, adminEmail, "Xuất kho hàng đổi");
+                if (inventoryService != null) {
+                    inventoryService.deductBatchesFifo(replacement.getId(), exchangeQty);
+                }
+                saveInventoryAudit(replacement, -exchangeQty, orderReturn, adminEmail, "Xuất kho hàng đổi");
+                hasAction = true;
             }
-            returnItem.setRestockedAt(Instant.now());
+
+            if (hasAction) {
+                returnItem.setRestockedAt(Instant.now());
+            }
         }
     }
 
