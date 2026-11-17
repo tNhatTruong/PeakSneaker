@@ -1,671 +1,775 @@
-import { useState, useEffect } from "react";
-import { Search, Filter, Eye, MoreHorizontal, X, Check, Truck, Clock, XCircle, Calendar, RefreshCw } from "lucide-react";
-import { AdminOrderService, type OrderResponse } from "../../services/admin/adminOrderService";
+import {
+  Check,
+  Download,
+  PackageOpen,
+  Plus,
+  Printer,
+  RefreshCw,
+  Search,
+  Truck,
+  X,
+  XCircle,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { useSearchParams } from "react-router-dom";
+import AdminDateRangeFilter from "../../components/admin/AdminDateRangeFilter";
+import AdminFilterHeader from "../../components/admin/AdminFilterHeader";
+import AdminPageHeader from "../../components/admin/AdminPageHeader";
+import AdminPagination from "../../components/admin/AdminPagination";
+import AdminCreateOrderModal from "../../components/admin/orders/AdminCreateOrderModal";
+import AdminOrderDetailPanel from "../../components/admin/orders/AdminOrderDetailPanel";
+import AdminOrderWaybillModal from "../../components/admin/orders/AdminOrderWaybillModal";
+import { AdminDetailEmptyState, AdminDetailPanel } from "../../components/admin/AdminDetailPanel";
+import {
+  AdminDashboardService,
+  type DashboardSummaryResponse,
+} from "../../services/admin/adminDashboardService";
+import {
+  AdminOrderService,
+  type OrderFilterParams,
+  type OrderResponse,
+} from "../../services/admin/adminOrderService";
+import {
+  formatOrderCurrency,
+  formatOrderDateTime,
+  getOrderDisplayCode,
+  ORDER_STATUS_META,
+  PAYMENT_STATUS_META,
+} from "../../utils/adminOrderPresentation";
+import {
+  createAdminDateRange,
+  getAdminDateRangeError,
+  type AdminDateRangeValue,
+} from "../../utils/adminDateRange";
+
+const PAGE_SIZE = 10;
+
+type OrderStatusFilter = OrderResponse["status"] | "ALL";
+type PaymentStatusFilter = OrderResponse["paymentStatus"] | "ALL";
+type PaymentMethodFilter = OrderResponse["paymentMethod"] | "ALL";
+
+interface FilterOption<T extends string> {
+  value: T;
+  label: string;
+}
+
+const ORDER_STATUS_OPTIONS: Array<FilterOption<OrderStatusFilter>> = [
+  { value: "ALL", label: "Tất cả" },
+  { value: "PENDING", label: "Chờ xác nhận" },
+  { value: "CONFIRMED", label: "Đã xác nhận" },
+  { value: "PROCESSING", label: "Đang xử lý" },
+  { value: "SHIPPING", label: "Đang giao" },
+  { value: "DELIVERED", label: "Đã giao" },
+  { value: "COMPLETED", label: "Hoàn thành" },
+  { value: "CANCELLED", label: "Đã hủy" },
+];
+
+const PAYMENT_STATUS_OPTIONS: Array<FilterOption<PaymentStatusFilter>> = [
+  { value: "ALL", label: "Mọi trạng thái" },
+  { value: "UNPAID", label: "Chưa thanh toán" },
+  { value: "PENDING", label: "Đang chờ thanh toán" },
+  { value: "PAID", label: "Đã thanh toán" },
+  { value: "FAILED", label: "Thanh toán lỗi" },
+  { value: "REFUNDED", label: "Đã hoàn tiền" },
+];
+
+const PAYMENT_METHOD_OPTIONS: Array<FilterOption<PaymentMethodFilter>> = [
+  { value: "ALL", label: "Mọi phương thức" },
+  { value: "COD", label: "COD" },
+  { value: "VNPAY", label: "VNPAY" },
+];
+
+const normalizeQueryValue = <T extends string>(value: string | null, allowedValues: readonly T[], fallback: T): T =>
+  value && allowedValues.includes(value as T) ? value as T : fallback;
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (typeof error !== "object" || error === null || !("response" in error)) return fallback;
+  const response = (error as { response?: { data?: { message?: unknown } } }).response;
+  return typeof response?.data?.message === "string" ? response.data.message : fallback;
+};
+
+const parseAmount = (value: string): number | undefined => {
+  if (!value.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+};
+
+const getStatusCount = (summary: DashboardSummaryResponse | null, status: OrderStatusFilter): number => {
+  if (!summary) return 0;
+  if (status === "ALL") return summary.totalOrders;
+  return summary.orderStatusCounts[status] ?? 0;
+};
 
 export default function AdminOrdersPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openedOrderIdRef = useRef<number | null>(null);
   const [orders, setOrders] = useState<OrderResponse[]>([]);
+  const [summary, setSummary] = useState<DashboardSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<OrderResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [detailedOrder, setDetailedOrder] = useState<OrderResponse | null>(null);
+  const [dispatchingShipment, setDispatchingShipment] = useState(false);
+  const [isStatusModalOpen, setStatusModalOpen] = useState(false);
+  const [isFilterOpen, setFilterOpen] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState<OrderResponse | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [isBatchWaybillOpen, setBatchWaybillOpen] = useState(false);
 
-  // Filter States
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<string>("Tất cả");
-  
-  // Default specificMonth to current month (YYYY-MM) as per instructions
-  const getInitialMonth = () => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  };
-  const [specificMonth, setSpecificMonth] = useState<string>(getInitialMonth());
-  const [specificDay, setSpecificDay] = useState<string>("");
-
-  // Pagination
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get("query") ?? "");
+  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
+  const [selectedStatus, setSelectedStatus] = useState<OrderStatusFilter>(() =>
+    normalizeQueryValue(searchParams.get("status"), ORDER_STATUS_OPTIONS.map((option) => option.value), "ALL"),
+  );
+  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<PaymentStatusFilter>(() =>
+    normalizeQueryValue(searchParams.get("paymentStatus"), PAYMENT_STATUS_OPTIONS.map((option) => option.value), "ALL"),
+  );
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethodFilter>(() =>
+    normalizeQueryValue(searchParams.get("paymentMethod"), PAYMENT_METHOD_OPTIONS.map((option) => option.value), "ALL"),
+  );
+  const [draftPaymentStatus, setDraftPaymentStatus] = useState(selectedPaymentStatus);
+  const [draftPaymentMethod, setDraftPaymentMethod] = useState(selectedPaymentMethod);
+  const [minAmount, setMinAmount] = useState(() => searchParams.get("minAmount") ?? "");
+  const [maxAmount, setMaxAmount] = useState(() => searchParams.get("maxAmount") ?? "");
+  const [appliedMinAmount, setAppliedMinAmount] = useState(minAmount);
+  const [appliedMaxAmount, setAppliedMaxAmount] = useState(maxAmount);
+  const [dateRange, setDateRange] = useState<AdminDateRangeValue>(() => createAdminDateRange("thirtyDays"));
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
-  const pageSize = 10;
+  const [isCreateModalOpen, setCreateModalOpen] = useState(false);
 
-  // Debounce search query
+  const dateRangeError = getAdminDateRangeError(dateRange, 366);
+  const parsedMinAmount = parseAmount(appliedMinAmount);
+  const parsedMaxAmount = parseAmount(appliedMaxAmount);
+  const currentMinAmount = parseAmount(minAmount);
+  const currentMaxAmount = parseAmount(maxAmount);
+  const amountError = currentMinAmount !== undefined && currentMaxAmount !== undefined && currentMinAmount > currentMaxAmount
+    ? "Giá trị tối thiểu không được lớn hơn giá trị tối đa."
+    : null;
+
+  const buildFilterParams = useCallback((targetPage = page, size = PAGE_SIZE): OrderFilterParams => {
+    const params: OrderFilterParams = { page: targetPage, size };
+    if (debouncedQuery.trim()) params.query = debouncedQuery.trim();
+    if (selectedStatus !== "ALL") params.status = selectedStatus;
+    if (selectedPaymentStatus !== "ALL") params.paymentStatus = selectedPaymentStatus;
+    if (selectedPaymentMethod !== "ALL") params.paymentMethod = selectedPaymentMethod;
+    if (dateRange.from) params.from = dateRange.from;
+    if (dateRange.to) params.to = dateRange.to;
+    if (parsedMinAmount !== undefined) params.minAmount = parsedMinAmount;
+    if (parsedMaxAmount !== undefined) params.maxAmount = parsedMaxAmount;
+    return params;
+  }, [dateRange.from, dateRange.to, debouncedQuery, page, parsedMaxAmount, parsedMinAmount, selectedPaymentMethod, selectedPaymentStatus, selectedStatus]);
+
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedQuery(searchQuery);
-    }, 400);
-    return () => clearTimeout(handler);
+    const timer = window.setTimeout(() => setDebouncedQuery(searchQuery), 350);
+    return () => window.clearTimeout(timer);
   }, [searchQuery]);
 
-  // Fetch orders when filters change
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
+    if (dateRangeError) return;
     setLoading(true);
     try {
-      const params: any = {
-        page,
-        size: pageSize,
-      };
-
-      if (debouncedQuery.trim()) {
-        params.query = debouncedQuery.trim();
-      }
-
-      if (selectedStatus !== "Tất cả") {
-        let statusEnum: any = "";
-        switch (selectedStatus) {
-          case "Chờ xác nhận":
-            statusEnum = "PENDING";
-            break;
-          case "Đang giao":
-            statusEnum = "SHIPPING";
-            break;
-          case "Hoàn thành":
-            statusEnum = "COMPLETED";
-            break;
-          case "Đã hủy":
-            statusEnum = "CANCELLED";
-            break;
-        }
-        if (statusEnum) {
-          params.status = statusEnum;
-        }
-      }
-
-      if (specificDay) {
-        params.specificDay = specificDay;
-      } else if (specificMonth) {
-        params.specificMonth = specificMonth;
-      }
-
-      const res = await AdminOrderService.getOrders(params);
-      if (res && res.items) {
-        setOrders(res.items);
-        setTotalPages(res.totalPages);
-        setTotalElements(res.totalElements);
-      }
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err?.response?.data?.message || "Không thể tải danh sách đơn hàng.");
+      const response = await AdminOrderService.getOrders(buildFilterParams());
+      setOrders(response.items);
+      setTotalPages(response.totalPages);
+      setTotalElements(response.totalElements);
+      setSelectedIds(new Set());
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Không thể tải danh sách đơn hàng."));
     } finally {
       setLoading(false);
     }
-  };
+  }, [buildFilterParams, dateRangeError]);
 
-  useEffect(() => {
-    fetchOrders();
-  }, [debouncedQuery, selectedStatus, specificDay, specificMonth, page]);
-
-  // Handle specific date/month changes
-  const handleDayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSpecificDay(e.target.value);
-    if (e.target.value) {
-      setSpecificMonth("");
-    }
-    setPage(0);
-  };
-
-  const handleMonthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSpecificMonth(e.target.value);
-    if (e.target.value) {
-      setSpecificDay("");
-    }
-    setPage(0);
-  };
-
-  // Clear all filters
-  const handleClearFilters = () => {
-    setSearchQuery("");
-    setSelectedStatus("Tất cả");
-    setSpecificDay("");
-    setSpecificMonth(getInitialMonth());
-    setPage(0);
-    toast.success("Đã cài lại bộ lọc");
-  };
-
-  // Fetch single order details for modal
-  const handleOpenDetailModal = async (order: OrderResponse) => {
-    setSelectedOrder(order);
-    setIsDetailModalOpen(true);
-    setDetailLoading(true);
-    setDetailedOrder(null);
+  const fetchSummary = useCallback(async () => {
+    if (dateRangeError || !dateRange.from || !dateRange.to) return;
     try {
-      const details = await AdminOrderService.getOrderById(order.id);
-      setDetailedOrder(details);
-    } catch (err: any) {
-      console.error(err);
+      setSummary(await AdminDashboardService.getSummary({ from: dateRange.from, to: dateRange.to }));
+    } catch {
+      toast.error("Không thể tải chỉ số đơn hàng trong kỳ.");
+    }
+  }, [dateRange.from, dateRange.to, dateRangeError]);
+
+  useEffect(() => { void fetchOrders(); }, [fetchOrders]);
+  useEffect(() => { void fetchSummary(); }, [fetchSummary]);
+
+  const handleOpenDetail = useCallback(async (order: OrderResponse, updateUrl = true) => {
+    openedOrderIdRef.current = order.id;
+    setSelectedOrder(order);
+    if (updateUrl) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set("orderId", String(order.id));
+      setSearchParams(nextParams);
+    }
+    setDetailLoading(true);
+    try {
+      setSelectedOrder(await AdminOrderService.getOrderById(order.id));
+    } catch {
       toast.error("Không thể tải chi tiết đơn hàng.");
     } finally {
       setDetailLoading(false);
     }
+  }, [searchParams, setSearchParams]);
+
+  const handleCloseDetail = useCallback(() => {
+    setSelectedOrder(null);
+    openedOrderIdRef.current = null;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("orderId");
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const handleCloseStatusModal = useCallback(() => {
+    setStatusModalOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isStatusModalOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (isStatusModalOpen) handleCloseStatusModal();
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [handleCloseStatusModal, isStatusModalOpen]);
+
+  const actionParam = searchParams.get("action");
+  useEffect(() => {
+    if (actionParam !== "create") return;
+    setCreateModalOpen(true);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("action");
+    setSearchParams(nextParams, { replace: true });
+  }, [actionParam, searchParams, setSearchParams]);
+
+  const orderIdParam = searchParams.get("orderId");
+  useEffect(() => {
+    const orderId = Number(orderIdParam);
+    if (!Number.isInteger(orderId) || orderId <= 0 || openedOrderIdRef.current === orderId) return;
+    let active = true;
+    openedOrderIdRef.current = orderId;
+    setDetailLoading(true);
+    void AdminOrderService.getOrderById(orderId)
+      .then((order) => { if (active) setSelectedOrder(order); })
+      .catch(() => { if (active) toast.error("Không thể tải chi tiết đơn hàng."); })
+      .finally(() => { if (active) setDetailLoading(false); });
+    return () => { active = false; };
+  }, [orderIdParam]);
+
+  const updateQueryFilter = useCallback((key: string, value: string, emptyValue = "ALL") => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (!value || value === emptyValue) nextParams.delete(key);
+    else nextParams.set(key, value);
+    nextParams.delete("orderId");
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const handleStatusChange = (status: OrderStatusFilter) => {
+    setSelectedStatus(status);
+    setPage(0);
+    updateQueryFilter("status", status);
   };
 
-  // Update order status
-  const handleUpdateStatus = async (status: string) => {
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setDebouncedQuery("");
+    setSelectedStatus("ALL");
+    setSelectedPaymentStatus("ALL");
+    setSelectedPaymentMethod("ALL");
+    setDraftPaymentStatus("ALL");
+    setDraftPaymentMethod("ALL");
+    setMinAmount("");
+    setMaxAmount("");
+    setAppliedMinAmount("");
+    setAppliedMaxAmount("");
+    setDateRange(createAdminDateRange("thirtyDays"));
+    setPage(0);
+    setSearchParams({});
+    toast.success("Đã cài lại bộ lọc");
+  };
+
+  const handleApplyBillingFilters = () => {
+    if (amountError) return;
+    setSelectedPaymentStatus(draftPaymentStatus);
+    setSelectedPaymentMethod(draftPaymentMethod);
+    setAppliedMinAmount(minAmount);
+    setAppliedMaxAmount(maxAmount);
+    setPage(0);
+    const nextParams = new URLSearchParams(searchParams);
+    if (draftPaymentStatus === "ALL") nextParams.delete("paymentStatus");
+    else nextParams.set("paymentStatus", draftPaymentStatus);
+    if (draftPaymentMethod === "ALL") nextParams.delete("paymentMethod");
+    else nextParams.set("paymentMethod", draftPaymentMethod);
+    if (minAmount) nextParams.set("minAmount", minAmount);
+    else nextParams.delete("minAmount");
+    if (maxAmount) nextParams.set("maxAmount", maxAmount);
+    else nextParams.delete("maxAmount");
+    nextParams.delete("orderId");
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const handleUpdateStatus = async (status: OrderResponse["status"]) => {
     if (!selectedOrder) return;
     const toastId = toast.loading("Đang cập nhật trạng thái...");
     try {
-      await AdminOrderService.updateOrderStatus(selectedOrder.id, status);
-      toast.success("Cập nhật trạng thái thành công!", { id: toastId });
-      setIsStatusModalOpen(false);
-      fetchOrders();
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err?.response?.data?.message || "Cập nhật thất bại.", { id: toastId });
+      const updatedOrder = await AdminOrderService.updateOrderStatus(selectedOrder.id, status);
+      setSelectedOrder(updatedOrder);
+      setStatusModalOpen(false);
+      await Promise.all([fetchOrders(), fetchSummary()]);
+      toast.success("Cập nhật trạng thái thành công", { id: toastId });
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Cập nhật trạng thái thất bại."), { id: toastId });
     }
   };
 
-  // Helpers
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(price);
-  };
-
-  const translateStatus = (status: string) => {
-    switch (status) {
-      case "PENDING":
-        return "Chờ xác nhận";
-      case "SHIPPING":
-        return "Đang giao";
-      case "COMPLETED":
-        return "Hoàn thành";
-      case "CANCELLED":
-        return "Đã hủy";
-      default:
-        return status;
+  const handleDispatchShipment = async () => {
+    if (!selectedOrder || dispatchingShipment) return;
+    setDispatchingShipment(true);
+    const toastId = toast.loading("Đang tạo vận đơn GHN...");
+    try {
+      const shipment = await AdminOrderService.dispatchShipment(selectedOrder.id);
+      setStatusModalOpen(false);
+      const [updatedDetail] = await Promise.all([
+        AdminOrderService.getOrderById(selectedOrder.id),
+        fetchOrders(),
+        fetchSummary(),
+      ]);
+      setSelectedOrder(updatedDetail);
+      toast.success(`Đã tạo vận đơn ${shipment.providerOrderCode}`, { id: toastId });
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Tạo vận đơn GHN thất bại."), { id: toastId });
+    } finally {
+      setDispatchingShipment(false);
     }
   };
 
-  const translatePaymentStatus = (paymentStatus: string) => {
-    switch (paymentStatus) {
-      case "PENDING":
-        return "Chưa thanh toán";
-      case "PAID":
-        return "Đã thanh toán";
-      case "FAILED":
-        return "Thanh toán lỗi";
-      case "REFUNDED":
-        return "Đã hoàn tiền";
-      default:
-        return paymentStatus;
+  const exportOrders = useCallback(async () => {
+    if (dateRangeError) return;
+    const toastId = toast.loading("Đang chuẩn bị dữ liệu xuất...");
+    try {
+      const response = await AdminOrderService.getOrders(buildFilterParams(0, Math.min(Math.max(totalElements, 100), 2000)));
+      const rows = [
+        ["Mã đơn", "Mã vận đơn GHN", "Khách hàng", "Số điện thoại", "Ngày đặt", "Trạng thái", "Thanh toán", "Phương thức", "Tổng tiền", "Ghi chú"],
+        ...response.items.map((order) => [
+          getOrderDisplayCode(order),
+          order.ghnOrderCode ?? "",
+          order.shippingName,
+          order.shippingPhone,
+          formatOrderDateTime(order.createdAt),
+          ORDER_STATUS_META[order.status].label,
+          PAYMENT_STATUS_META[order.paymentStatus].label,
+          order.paymentMethod,
+          order.finalAmount,
+          order.note ?? "",
+        ]),
+      ];
+      const csv = `\uFEFF${rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n")}`;
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `peaksneaker-orders-${dateRange.from}-${dateRange.to}.csv`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Đã xuất ${response.items.length} đơn hàng`, { id: toastId });
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Không thể xuất danh sách đơn hàng."), { id: toastId });
     }
-  };
+  }, [buildFilterParams, dateRange.from, dateRange.to, dateRangeError, totalElements]);
 
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case "COMPLETED":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "SHIPPING":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      case "CANCELLED":
-        return "bg-red-100 text-red-800 border-red-200";
-      case "PENDING":
-      default:
-        return "bg-yellow-100 text-yellow-800 border-yellow-200";
-    }
-  };
+  useEffect(() => {
+    const handleExport = () => { void exportOrders(); };
+    window.addEventListener("admin:export", handleExport);
+    return () => window.removeEventListener("admin:export", handleExport);
+  }, [exportOrders]);
 
-  const statusOptions = ["Tất cả", "Chờ xác nhận", "Đang giao", "Hoàn thành", "Đã hủy"];
+  const printableOrdersOnPage = useMemo(
+    () => orders.filter((order) => Boolean(order.ghnOrderCode?.trim())),
+    [orders],
+  );
+  const selectedPrintableOrders = useMemo(
+    () => printableOrdersOnPage.filter((order) => selectedIds.has(order.id)),
+    [printableOrdersOnPage, selectedIds],
+  );
+  const allVisibleSelected =
+    printableOrdersOnPage.length > 0 &&
+    printableOrdersOnPage.every((order) => selectedIds.has(order.id));
+  const activeFilterCount = useMemo(() => [
+    debouncedQuery.trim(),
+    selectedStatus !== "ALL",
+    selectedPaymentStatus !== "ALL",
+    selectedPaymentMethod !== "ALL",
+    appliedMinAmount,
+    appliedMaxAmount,
+  ].filter(Boolean).length, [appliedMaxAmount, appliedMinAmount, debouncedQuery, selectedPaymentMethod, selectedPaymentStatus, selectedStatus]);
 
   return (
-    <div className="space-y-6 pb-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">Quản lý Đơn hàng</h1>
-          <p className="text-sm text-zinc-500 mt-1">
-            Hiển thị <span className="font-semibold text-zinc-800">{totalElements}</span> đơn hàng
-          </p>
-        </div>
-        <button
-          onClick={handleClearFilters}
-          className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 shadow-sm hover:border-zinc-300 transition-all rounded-lg"
-        >
-          <RefreshCw className="w-3.5 h-3.5" /> Cài lại bộ lọc
-        </button>
-      </div>
-
-      {/* Filter and Date selection panel */}
-      <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
-        {/* Filter Header */}
-        <div className="px-5 py-3 bg-zinc-50/80 border-b border-zinc-100 flex items-center gap-2">
-          <Filter className="w-3.5 h-3.5 text-zinc-400" />
-          <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Bộ lọc & Tìm kiếm</span>
-        </div>
-
-        <div className="p-5 space-y-5">
-          {/* Row 1: Search + Dates */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
-            {/* Search bar — 6/12 cols */}
-            <div className="lg:col-span-6">
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Tìm kiếm đơn hàng
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setPage(0);
-                  }}
-                  placeholder="Nhập mã đơn, tên người nhận, SĐT..."
-                  className="w-full pl-10 pr-4 py-2.5 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:bg-white focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100 outline-none transition-all placeholder-zinc-400"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => { setSearchQuery(""); setPage(0); }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-zinc-400 hover:text-zinc-600 transition-colors"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Date Picker — 3/12 cols */}
-            <div className="lg:col-span-3">
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center gap-1">
-                <Calendar className="w-3 h-3" /> Theo ngày
-              </label>
-              <input
-                type="date"
-                value={specificDay}
-                onChange={handleDayChange}
-                className="w-full px-3 py-2.5 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:bg-white focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100 outline-none transition-all text-zinc-700"
-              />
-            </div>
-
-            {/* Month Picker — 3/12 cols */}
-            <div className="lg:col-span-3">
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center gap-1">
-                <Calendar className="w-3 h-3" /> Theo tháng
-              </label>
-              <input
-                type="month"
-                value={specificMonth}
-                onChange={handleMonthChange}
-                className="w-full px-3 py-2.5 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:bg-white focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100 outline-none transition-all text-zinc-700"
-              />
-            </div>
+    <div className="space-y-3 pb-6">
+      <AdminPageHeader
+        title="Đơn hàng"
+        description="Quản lý, theo dõi và xử lý tất cả đơn hàng của cửa hàng."
+        actions={(
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void exportOrders()}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+            >
+              <Download className="h-4 w-4" /> Xuất báo cáo
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void fetchOrders();
+                void fetchSummary();
+              }}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Làm mới
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreateModalOpen(true)}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-xs font-bold text-white transition hover:bg-slate-800"
+            >
+              <Plus className="h-4 w-4" /> Tạo đơn hàng
+            </button>
           </div>
+        )}
+      />
 
-          {/* Row 2: Status Tabs */}
-          <div className="pt-4 border-t border-zinc-100">
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2.5">
-              Trạng thái đơn hàng
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {statusOptions.map((status) => (
-                <button
-                  key={status}
-                  onClick={() => {
-                    setSelectedStatus(status);
-                    setPage(0);
-                  }}
-                  className={`px-4 py-2 text-xs font-semibold rounded-lg border transition-all duration-150 ${
-                    selectedStatus === status
-                      ? "bg-zinc-900 text-white border-zinc-900 shadow-sm"
-                      : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-                  }`}
-                >
-                  {status}
+      <div className="grid min-w-0 gap-3 2xl:grid-cols-[minmax(0,1fr)_340px] 2xl:items-start">
+      <div className="min-w-0 space-y-3">
+      <div className="z-30 -mx-1 bg-slate-50 px-1 pb-2 2xl:sticky 2xl:-top-5">
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <AdminFilterHeader
+            isOpen={isFilterOpen}
+            onToggle={() => setFilterOpen((current) => !current)}
+            activeCount={activeFilterCount}
+            onReset={handleResetFilters}
+          />
+
+          {isFilterOpen && (
+            <div className="space-y-3 p-3">
+              <div className="grid items-end gap-2 lg:grid-cols-[minmax(240px,0.8fr)_minmax(0,1.4fr)]">
+              <label>
+                <span className="sr-only">Tìm kiếm đơn hàng</span>
+                <span className="relative block">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); setPage(0); }} placeholder="Mã đơn, mã vận đơn GHN, tên khách hàng, SĐT..." className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm text-slate-700 outline-none focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100" />
+                  {searchQuery && <button type="button" onClick={() => setSearchQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700" aria-label="Xóa từ khóa"><X className="h-3.5 w-3.5" /></button>}
+                </span>
+              </label>
+                <AdminDateRangeFilter value={dateRange} onChange={(value) => { setDateRange(value); setPage(0); }} title="Kỳ đơn hàng" allowAll={false} maxRangeDays={366} variant="toolbar" showPresets={false} />
+              </div>
+
+              <div className="grid items-end gap-2 border-t border-slate-100 pt-3 md:grid-cols-2 xl:grid-cols-[minmax(190px,1fr)_minmax(190px,1fr)_minmax(320px,1.4fr)_auto]">
+                <label>
+                  <span className="sr-only">Trạng thái thanh toán</span>
+                  <select value={draftPaymentStatus} onChange={(event) => setDraftPaymentStatus(event.target.value as PaymentStatusFilter)} className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100">
+                    {PAYMENT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+
+                <label>
+                  <span className="sr-only">Phương thức thanh toán</span>
+                  <select value={draftPaymentMethod} onChange={(event) => setDraftPaymentMethod(event.target.value as PaymentMethodFilter)} className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100">
+                    {PAYMENT_METHOD_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+
+                <fieldset className="md:col-span-2 xl:col-span-1">
+                  <legend className="sr-only">Giá trị đơn hàng</legend>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="relative">
+                      <span className="sr-only">Giá trị đơn từ</span>
+                      <input id="order-min-amount" name="minAmount" type="number" inputMode="numeric" min="0" step="1000" value={minAmount} onChange={(event) => setMinAmount(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") handleApplyBillingFilters(); }} placeholder="Tối thiểu" className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-3 pr-8 text-sm font-semibold text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">đ</span>
+                    </label>
+                    <label className="relative">
+                      <span className="sr-only">Giá trị đơn đến</span>
+                      <input id="order-max-amount" name="maxAmount" type="number" inputMode="numeric" min="0" step="1000" value={maxAmount} onChange={(event) => setMaxAmount(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") handleApplyBillingFilters(); }} placeholder="Tối đa" className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-3 pr-8 text-sm font-semibold text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">đ</span>
+                    </label>
+                  </div>
+                </fieldset>
+                <button type="button" onClick={handleApplyBillingFilters} disabled={Boolean(amountError)} className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-slate-950 px-5 text-sm font-bold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400">
+                  <Search className="h-4 w-4" /> Áp dụng
                 </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Orders Table list */}
-      <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="p-20 flex flex-col items-center justify-center space-y-4">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-zinc-950"></div>
-            <p className="text-sm font-semibold text-zinc-500">Đang tải danh sách đơn hàng...</p>
-          </div>
-        ) : orders.length === 0 ? (
-          <div className="p-20 flex flex-col items-center justify-center text-center space-y-3">
-            <XCircle className="h-12 w-12 text-zinc-300" />
-            <h3 className="text-base font-bold text-zinc-800">Không tìm thấy đơn hàng nào</h3>
-            <p className="text-sm text-zinc-500 max-w-sm">
-              Không có đơn hàng nào khớp với điều kiện lọc hiện tại. Hãy thử thay đổi bộ lọc hoặc cài lại mặc định.
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left border-collapse">
-              <thead className="bg-zinc-50 text-[11px] font-semibold uppercase tracking-wider text-zinc-500 border-b border-zinc-200">
-                <tr>
-                  <th className="px-6 py-3.5">Mã Đơn</th>
-                  <th className="px-6 py-3.5">Khách Hàng</th>
-                  <th className="px-6 py-3.5">Ngày Đặt</th>
-                  <th className="px-6 py-3.5">Tổng Tiền</th>
-                  <th className="px-6 py-3.5">Trạng Thái</th>
-                  <th className="px-6 py-3.5">Thanh Toán</th>
-                  <th className="px-6 py-3.5 text-right">Hành Động</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {orders.map((order) => (
-                  <tr key={order.id} className="hover:bg-zinc-50/80 transition-colors">
-                    <td className="px-6 py-4 font-bold text-zinc-950">#{order.id}</td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-zinc-900">{order.shippingName}</div>
-                      <div className="text-xs text-zinc-400 mt-0.5">{order.shippingPhone}</div>
-                    </td>
-                    <td className="px-6 py-4 text-zinc-600">
-                      {new Date(order.createdAt).toLocaleString("vi-VN", {
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </td>
-                    <td className="px-6 py-4 font-bold text-zinc-900">{formatPrice(order.finalAmount)}</td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border ${getStatusBadgeClass(
-                          order.status
-                        )}`}
-                      >
-                        {translateStatus(order.status)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`text-xs font-semibold ${
-                          order.paymentStatus === "PAID"
-                            ? "text-green-600 font-bold"
-                            : order.paymentStatus === "REFUNDED"
-                            ? "text-blue-600"
-                            : "text-zinc-500"
-                        }`}
-                      >
-                        {translatePaymentStatus(order.paymentStatus)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="inline-flex gap-2">
-                        <button
-                          onClick={() => handleOpenDetailModal(order)}
-                          className="p-2 text-zinc-500 hover:text-zinc-950 hover:bg-zinc-100 rounded transition-all"
-                          title="Xem chi tiết"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedOrder(order);
-                            setIsStatusModalOpen(true);
-                          }}
-                          className="p-2 text-zinc-500 hover:text-zinc-950 hover:bg-zinc-100 rounded transition-all"
-                          title="Cập nhật trạng thái"
-                        >
-                          <MoreHorizontal className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Pagination bar */}
-        {!loading && totalPages > 1 && (
-          <div className="px-6 py-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
-            <span className="text-xs text-zinc-500">
-              Trang <span className="font-semibold text-zinc-900">{page + 1}</span> / {totalPages}
-            </span>
-            <div className="flex gap-2">
-              <button
-                disabled={page === 0}
-                onClick={() => setPage((prev) => prev - 1)}
-                className="px-3 py-1.5 text-xs font-bold bg-white border border-zinc-200 rounded text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 disabled:hover:bg-white transition-all"
-              >
-                Trước
-              </button>
-              <button
-                disabled={page === totalPages - 1}
-                onClick={() => setPage((prev) => prev + 1)}
-                className="px-3 py-1.5 text-xs font-bold bg-white border border-zinc-200 rounded text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 disabled:hover:bg-white transition-all"
-              >
-                Sau
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Modal Chi Tiết Đơn Hàng */}
-      {isDetailModalOpen && selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col transform transition-all border border-zinc-100 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-5 border-b border-zinc-200">
-              <div>
-                <h3 className="text-lg font-black text-zinc-950 uppercase tracking-tight">Chi tiết đơn hàng #{selectedOrder.id}</h3>
-                <p className="text-xs text-zinc-500 mt-1">
-                  Đặt lúc: {new Date(selectedOrder.createdAt).toLocaleString("vi-VN")}
-                </p>
               </div>
-              <button
-                onClick={() => setIsDetailModalOpen(false)}
-                className="text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 p-1.5 rounded transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              {amountError && <p className="text-xs font-semibold text-red-600" role="alert">Giá trị từ không được lớn hơn giá trị đến.</p>}
+              {dateRangeError && <p className="text-xs font-semibold text-red-600" role="alert">{dateRangeError}</p>}
             </div>
+          )}
+        </section>
+      </div>
 
-            <div className="p-6 overflow-y-auto flex-1 space-y-6">
-              {detailLoading ? (
-                <div className="py-20 flex flex-col items-center justify-center space-y-3">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-zinc-950"></div>
-                  <p className="text-xs font-medium text-zinc-400">Đang lấy chi tiết đơn hàng...</p>
-                </div>
-              ) : detailedOrder ? (
-                <>
-                  {/* Delivery and Customer Information */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-zinc-50 p-4 border border-zinc-200 rounded">
-                    <div className="text-sm space-y-2">
-                      <h4 className="text-xs font-black uppercase tracking-wider text-zinc-400 mb-1.5">Thông tin giao hàng</h4>
-                      <p className="font-bold text-zinc-900">{detailedOrder.shippingName}</p>
-                      <p className="text-zinc-600">SĐT: <span className="font-medium text-zinc-950">{detailedOrder.shippingPhone}</span></p>
-                      <p className="text-zinc-600">
-                        Địa chỉ:{" "}
-                        <span className="font-medium text-zinc-950">
-                          {detailedOrder.shippingStreet}, {detailedOrder.shippingWard}, {detailedOrder.shippingDistrict},{" "}
-                          {detailedOrder.shippingProvince}
-                        </span>
-                      </p>
-                    </div>
-                    <div className="text-sm space-y-2">
-                      <h4 className="text-xs font-black uppercase tracking-wider text-zinc-400 mb-1.5">Thông tin thanh toán</h4>
-                      <p className="text-zinc-600">
-                        Trạng thái đơn hàng:{" "}
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border ${getStatusBadgeClass(detailedOrder.status)}`}>
-                          {translateStatus(detailedOrder.status)}
-                        </span>
-                      </p>
-                      <p className="text-zinc-600">
-                        Thanh toán:{" "}
-                        <span className="font-bold text-zinc-950">{translatePaymentStatus(detailedOrder.paymentStatus)}</span>
-                      </p>
-                      {detailedOrder.note && (
-                        <p className="text-zinc-500 italic mt-2">
-                          Ghi chú: "{detailedOrder.note}"
-                        </p>
-                      )}
-                    </div>
-                  </div>
+      <section className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <nav className="overflow-x-auto border-b border-slate-200 bg-slate-50/60 px-3 pb-2 pt-2.5 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-track]:bg-slate-100" aria-label="Lọc nhanh trạng thái đơn hàng">
+            <div className="flex min-w-max gap-2">
+              {ORDER_STATUS_OPTIONS.map((option) => {
+                const active = selectedStatus === option.value;
+                return (
+                  <button key={option.value} type="button" onClick={() => handleStatusChange(option.value)} className={`inline-flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-bold transition-colors ${active ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"}`}>
+                    {option.label}<span className={`rounded-md px-2 py-0.5 text-[11px] ${active ? "bg-white/15 text-white" : "bg-slate-100 text-slate-500"}`}>{getStatusCount(summary, option.value)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </nav>
 
-                  {/* Products Table list */}
-                  <div>
-                    <h4 className="text-xs font-black uppercase tracking-wider text-zinc-400 mb-3">Sản phẩm đã đặt</h4>
-                    <div className="border border-zinc-200 rounded overflow-hidden">
-                      <table className="w-full text-sm text-left">
-                        <thead className="bg-zinc-50 text-[11px] font-bold text-zinc-500 border-b border-zinc-200 uppercase tracking-wider">
-                          <tr>
-                            <th className="px-4 py-3">Sản phẩm</th>
-                            <th className="px-4 py-3 text-right">Đơn giá</th>
-                            <th className="px-4 py-3 text-center">SL</th>
-                            <th className="px-4 py-3 text-right">Thành tiền</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-zinc-200">
-                          {detailedOrder.items && detailedOrder.items.length > 0 ? (
-                            detailedOrder.items.map((item) => (
-                              <tr key={item.id} className="hover:bg-zinc-50/50">
-                                <td className="px-4 py-3.5">
-                                  <div className="font-bold text-zinc-900">{item.productName}</div>
-                                  {item.variantName && (
-                                    <div className="text-xs text-zinc-400 mt-0.5">Biến thể: {item.variantName}</div>
-                                  )}
-                                  {item.sku && (
-                                    <div className="text-[10px] font-mono text-zinc-400">SKU: {item.sku}</div>
-                                  )}
-                                </td>
-                                <td className="px-4 py-3.5 text-right font-medium text-zinc-600">
-                                  {formatPrice(item.unitPrice)}
-                                </td>
-                                <td className="px-4 py-3.5 text-center font-bold text-zinc-700">{item.quantity}</td>
-                                <td className="px-4 py-3.5 text-right font-bold text-zinc-900">
-                                  {formatPrice(item.subtotal)}
-                                </td>
-                              </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan={4} className="text-center py-6 text-zinc-400">
-                                Không có sản phẩm nào
-                              </td>
-                            </tr>
+          {selectedPrintableOrders.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-100 bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700">
+              <span>Đã chọn <strong>{selectedPrintableOrders.length}</strong> đơn hàng đã có mã vận đơn GHN.</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBatchWaybillOpen(true)}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-slate-950 px-3 text-xs font-bold text-white transition hover:bg-slate-800"
+                >
+                  <Printer className="h-3.5 w-3.5" /> In vận đơn hàng loạt ({selectedPrintableOrders.length} đơn)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds(new Set())}
+                  className="inline-flex h-8 items-center rounded-lg border border-blue-200 bg-white px-2.5 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+                >
+                  Bỏ chọn
+                </button>
+              </div>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="space-y-px bg-slate-100 p-px" aria-label="Đang tải danh sách đơn hàng">
+              {Array.from({ length: 7 }).map((_, index) => <div key={index} className="h-14 animate-pulse bg-white" />)}
+            </div>
+          ) : orders.length === 0 ? (
+            <div className="grid min-h-72 place-items-center p-8 text-center">
+              <div><PackageOpen className="mx-auto h-10 w-10 text-slate-300" /><h2 className="mt-3 text-sm font-black text-slate-800">Không tìm thấy đơn hàng</h2><p className="mt-1 text-xs text-slate-400">Hãy thay đổi điều kiện lọc hoặc cài lại bộ lọc.</p></div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[840px] table-fixed text-left text-xs">
+                <colgroup>
+                  <col className="w-11" /><col className="w-[17%]" /><col className="w-[16%]" /><col className="w-[10%]" />
+                  <col className="w-[15%]" /><col className="w-[15%]" /><col className="w-[15%]" /><col className="w-[12%]" />
+                </colgroup>
+                <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="w-11 px-4 py-3.5">
+                      <input
+                        type="checkbox"
+                        disabled={printableOrdersOnPage.length === 0}
+                        checked={allVisibleSelected}
+                        title={
+                          printableOrdersOnPage.length > 0
+                            ? "Chọn tất cả đơn hàng đã có mã vận đơn trên trang"
+                            : "Chưa có đơn hàng nào trên trang có mã vận đơn GHN"
+                        }
+                        onChange={(event) =>
+                          setSelectedIds(
+                            event.target.checked
+                              ? new Set(printableOrdersOnPage.map((order) => order.id))
+                              : new Set(),
+                          )
+                        }
+                        className="disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label="Chọn toàn bộ đơn hàng có mã vận đơn trên trang"
+                      />
+                    </th>
+                    <th className="py-3.5">Mã đơn</th><th>Khách hàng</th><th>Sản phẩm</th><th>Tổng tiền</th><th>Thanh toán</th><th>Trạng thái</th><th className="pr-4">Ngày đặt</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {orders.map((order) => {
+                    const status = ORDER_STATUS_META[order.status];
+                    const payment = PAYMENT_STATUS_META[order.paymentStatus];
+                    const isSelected = selectedOrder?.id === order.id;
+                    const hasTrackingCode = Boolean(order.ghnOrderCode?.trim());
+                    return (
+                      <tr key={order.id} onClick={() => void handleOpenDetail(order)} className={`cursor-pointer transition-colors hover:bg-blue-50/30 ${isSelected ? "bg-blue-50/50" : "bg-white"}`}>
+                        <td className="px-4 py-3.5">
+                          <input
+                            type="checkbox"
+                            disabled={!hasTrackingCode}
+                            checked={hasTrackingCode && selectedIds.has(order.id)}
+                            title={
+                              hasTrackingCode
+                                ? `Chọn đơn ${getOrderDisplayCode(order)} để in vận đơn`
+                                : "Đơn hàng chưa có mã vận đơn GHN nên chưa thể chọn in vận đơn"
+                            }
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) =>
+                              setSelectedIds((current) => {
+                                const next = new Set(current);
+                                if (event.target.checked && hasTrackingCode) next.add(order.id);
+                                else next.delete(order.id);
+                                return next;
+                              })
+                            }
+                            className="disabled:cursor-not-allowed disabled:opacity-35"
+                            aria-label={`Chọn đơn ${getOrderDisplayCode(order)}`}
+                          />
+                        </td>
+                        <td className="py-3.5 pr-4">
+                          <button type="button" onClick={(event) => { event.stopPropagation(); void handleOpenDetail(order); }} title={getOrderDisplayCode(order)} className="block max-w-full truncate whitespace-nowrap font-mono text-xs font-black text-blue-600 hover:underline">{getOrderDisplayCode(order)}</button>
+                          {order.ghnOrderCode ? (
+                            <span title={`Mã vận đơn GHN: ${order.ghnOrderCode}`} className="mt-1 inline-flex max-w-full items-center gap-1 truncate rounded bg-blue-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-blue-700 ring-1 ring-blue-200">
+                              <Truck className="h-2.5 w-2.5 shrink-0" />
+                              {order.ghnOrderCode}
+                            </span>
+                          ) : order.status === "PROCESSING" ? (
+                            <span className="mt-1 inline-block text-[10px] font-bold text-amber-600">Chờ tạo vận đơn</span>
+                          ) : null}
+                        </td>
+                        <td className="pr-4"><p className="max-w-44 truncate text-sm font-bold text-slate-800">{order.shippingName}</p><p className="mt-1 text-xs text-slate-400">{order.shippingPhone}</p></td>
+                        <td className="pr-4"><div className="flex items-center"><div className="flex -space-x-1.5">{order.items.slice(0, 2).map((item) => <span key={item.id} className="grid h-9 w-10 place-items-center overflow-hidden rounded-md border border-white bg-slate-50">{item.imageUrl ? <img src={item.imageUrl} alt="" className="h-full w-full object-contain" /> : <PackageOpen className="h-4 w-4 text-slate-300" />}</span>)}</div>{order.items.length > 2 && <span className="ml-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-bold text-slate-500">+{order.items.length - 2}</span>}</div></td>
+                        <td className="pr-4"><p className="text-sm font-black text-slate-900">{formatOrderCurrency(order.finalAmount)}</p><p className="mt-1 text-xs text-slate-400">{order.items.length} sản phẩm</p></td>
+                        <td className="pr-4"><span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-bold ${payment.badgeClassName}`}>{payment.label}</span><p className="mt-1.5 text-xs font-semibold text-slate-500">{order.paymentMethod}</p></td>
+                        <td className="pr-4">
+                          <span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-bold ${status.badgeClassName}`}>{status.label}</span>
+                          {order.latestReturnId && (
+                            <a
+                              href={`/admin/returns?orderId=${order.id}`}
+                              className="mt-1.5 block text-[11px] font-bold text-violet-600 hover:underline"
+                            >
+                              RMA #{order.latestReturnId} · {order.latestReturnStatus}
+                            </a>
                           )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                        </td>
+                        <td className="pr-4 text-xs text-slate-500"><span className="whitespace-nowrap">{formatOrderDateTime(order.createdAt)}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-                  {/* Calculations breakdown */}
-                  <div className="flex justify-end text-sm">
-                    <div className="w-80 space-y-2.5 bg-zinc-50 p-4 border border-zinc-200 rounded">
-                      <div className="flex justify-between text-zinc-600">
-                        <span>Tạm tính:</span>
-                        <span className="font-semibold text-zinc-900">{formatPrice(detailedOrder.subtotalAmount)}</span>
-                      </div>
-                      <div className="flex justify-between text-zinc-600">
-                        <span>Phí vận chuyển:</span>
-                        <span className="font-semibold text-zinc-900">{formatPrice(detailedOrder.shippingFee)}</span>
-                      </div>
-                      {detailedOrder.discountAmount > 0 && (
-                        <div className="flex justify-between text-green-600">
-                          <span>Giảm giá (Voucher):</span>
-                          <span>-{formatPrice(detailedOrder.discountAmount)}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between font-bold text-base text-zinc-950 pt-2.5 border-t border-zinc-200">
-                        <span>Tổng thanh toán:</span>
-                        <span className="text-lg font-black text-zinc-950">{formatPrice(detailedOrder.finalAmount)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="py-20 text-center text-zinc-400">Không tìm thấy dữ liệu chi tiết.</div>
+          <AdminPagination
+            page={page}
+            totalPages={totalPages}
+            totalElements={totalElements}
+            pageSize={PAGE_SIZE}
+            visibleCount={orders.length}
+            itemLabel="đơn hàng"
+            disabled={loading}
+            onPageChange={setPage}
+            className="bg-slate-50"
+          />
+      </section>
+      </div>
+      <AdminDetailPanel ariaLabel={selectedOrder ? "Chi tiết đơn hàng" : "Chưa chọn đơn hàng"}>
+        {selectedOrder || detailLoading ? (
+          <AdminOrderDetailPanel
+            order={selectedOrder}
+            loading={detailLoading}
+            onClose={handleCloseDetail}
+            onManage={() => setStatusModalOpen(true)}
+            onDispatchShipment={handleDispatchShipment}
+            dispatchingShipment={dispatchingShipment}
+          />
+        ) : (
+          <AdminDetailEmptyState
+            icon={<PackageOpen className="h-9 w-9" />}
+            title="Chưa chọn đơn hàng"
+            description="Chọn một đơn hàng trong danh sách để xem thông tin, trạng thái và in phiếu vận đơn."
+            items={["Thông tin khách hàng & sản phẩm", "Cập nhật trạng thái đơn hàng", "Tạo & in mã vận đơn GHN"]}
+          />
+        )}
+      </AdminDetailPanel>
+      </div>
+
+      {isStatusModalOpen && selectedOrder && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/55 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.currentTarget === event.target) handleCloseStatusModal(); }}>
+          <section className="w-full max-w-md overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="order-status-title">
+            <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <div><h2 id="order-status-title" className="text-base font-black text-slate-950">Xử lý đơn hàng</h2><p className="mt-1 font-mono text-xs text-slate-400">{getOrderDisplayCode(selectedOrder)}</p></div>
+              <button type="button" onClick={handleCloseStatusModal} className="grid h-10 w-10 place-items-center rounded-lg text-slate-400 hover:bg-slate-100" aria-label="Đóng"><X className="h-5 w-5" /></button>
+            </header>
+            <div className="space-y-2 p-4">
+              {selectedOrder.status === "PENDING" && (
+                <button type="button" onClick={() => void handleUpdateStatus("CONFIRMED")} className="flex w-full items-center gap-4 rounded-lg border border-slate-200 p-4 text-left hover:border-sky-300 hover:bg-sky-50">
+                  <Check className="h-6 w-6 text-sky-500" />
+                  <span><strong className="block text-sm text-slate-800">Xác nhận đơn hàng</strong><small className="mt-1 block text-xs text-slate-400">Đã kiểm tra thông tin và tiếp nhận đơn</small></span>
+                </button>
+              )}
+              {selectedOrder.status === "CONFIRMED" && (
+                <button type="button" onClick={() => void handleUpdateStatus("PROCESSING")} className="flex w-full items-center gap-4 rounded-lg border border-slate-200 p-4 text-left hover:border-violet-300 hover:bg-violet-50">
+                  <PackageOpen className="h-6 w-6 text-violet-500" />
+                  <span><strong className="block text-sm text-slate-800">Bắt đầu xử lý</strong><small className="mt-1 block text-xs text-slate-400">Soạn hàng, đóng gói và chuẩn bị bàn giao</small></span>
+                </button>
+              )}
+              {selectedOrder.status === "PROCESSING" && !selectedOrder.ghnOrderCode && (
+                <button type="button" onClick={() => void handleDispatchShipment()} className="flex w-full items-center gap-4 rounded-lg border border-slate-200 p-4 text-left hover:border-blue-300 hover:bg-blue-50">
+                  <Truck className="h-6 w-6 text-blue-500" />
+                  <span><strong className="block text-sm text-slate-800">Tạo vận đơn GHN</strong><small className="mt-1 block text-xs text-slate-400">Gửi thông tin đơn sang môi trường vận chuyển đã cấu hình</small></span>
+                </button>
+              )}
+              {selectedOrder.status === "PROCESSING" && selectedOrder.ghnOrderCode && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+                  <strong className="block">Đang chờ GHN lấy hàng</strong>
+                  <span className="mt-1 block text-xs">Vận đơn {selectedOrder.ghnOrderCode}. Trạng thái sẽ tự cập nhật qua webhook.</span>
+                </div>
+              )}
+              {selectedOrder.status === "SHIPPING" && !selectedOrder.ghnOrderCode && (
+                <button type="button" onClick={() => void handleUpdateStatus("DELIVERED")} className="flex w-full items-center gap-4 rounded-lg border border-slate-200 p-4 text-left hover:border-teal-300 hover:bg-teal-50">
+                  <Check className="h-6 w-6 text-teal-500" />
+                  <span><strong className="block text-sm text-slate-800">Xác nhận đã giao</strong><small className="mt-1 block text-xs text-slate-400">Khách hàng đã nhận được hàng</small></span>
+                </button>
+              )}
+              {selectedOrder.status === "SHIPPING" && selectedOrder.ghnOrderCode && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+                  <strong className="block">GHN đang vận chuyển</strong>
+                  <span className="mt-1 block text-xs">Không cập nhật thủ công. Hệ thống sẽ ghi nhận khi webhook báo giao thành công.</span>
+                </div>
+              )}
+              {selectedOrder.status === "DELIVERED" && (
+                <button type="button" onClick={() => void handleUpdateStatus("COMPLETED")} className="flex w-full items-center gap-4 rounded-lg border border-slate-200 p-4 text-left hover:border-emerald-300 hover:bg-emerald-50">
+                  <Check className="h-6 w-6 text-emerald-500" />
+                  <span><strong className="block text-sm text-slate-800">Hoàn tất đơn hàng</strong><small className="mt-1 block text-xs text-slate-400">Kết thúc quy trình giao nhận của đơn hàng</small></span>
+                </button>
+              )}
+              {(selectedOrder.status === "PENDING" || selectedOrder.status === "CONFIRMED") && (
+                <button type="button" onClick={() => void handleUpdateStatus("CANCELLED")} className="flex w-full items-center gap-4 rounded-lg border border-slate-200 p-4 text-left hover:border-red-300 hover:bg-red-50">
+                  <XCircle className="h-6 w-6 text-red-500" />
+                  <span><strong className="block text-sm text-slate-800">Hủy đơn hàng</strong><small className="mt-1 block text-xs text-slate-400">Dừng xử lý và hoàn lại tồn kho đã giữ</small></span>
+                </button>
+              )}
+              {(selectedOrder.status === "COMPLETED" || selectedOrder.status === "CANCELLED") && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                  Đơn hàng đã ở trạng thái kết thúc và không còn hành động chuyển trạng thái.
+                </div>
               )}
             </div>
-
-            <div className="p-5 border-t border-zinc-200 flex justify-end bg-zinc-50">
-              <button
-                onClick={() => setIsDetailModalOpen(false)}
-                className="px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white bg-zinc-950 hover:bg-zinc-800 rounded transition-all shadow-sm"
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
+          </section>
         </div>
       )}
 
-      {/* Modal Cập Nhật Trạng Trạng Thái */}
-      {isStatusModalOpen && selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded shadow-2xl w-full max-w-md overflow-hidden transform transition-all border border-zinc-100 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-4 border-b border-zinc-200">
-              <h3 className="font-black text-zinc-950 uppercase tracking-tight text-sm">Cập nhật đơn #{selectedOrder.id}</h3>
-              <button
-                onClick={() => setIsStatusModalOpen(false)}
-                className="text-zinc-400 hover:text-zinc-900"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-5 space-y-3">
-              <p className="text-xs text-zinc-400 mb-2">Chọn trạng thái tiếp theo cho đơn hàng này:</p>
-              
-              <button
-                onClick={() => handleUpdateStatus("PENDING")}
-                className="w-full flex items-center p-3 rounded border border-zinc-200 hover:border-yellow-500 hover:bg-yellow-50/50 transition-all text-left group"
-              >
-                <Clock className="w-5 h-5 text-yellow-500 mr-3.5 group-hover:scale-110 transition-all" />
-                <div>
-                  <div className="font-bold text-sm text-zinc-800">Chờ xác nhận</div>
-                  <div className="text-[10px] text-zinc-400 mt-0.5">Trạng thái mới nhận đơn, chưa xử lý hàng</div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => handleUpdateStatus("SHIPPING")}
-                disabled={selectedOrder.status !== "PENDING"}
-                className="w-full flex items-center p-3 rounded border border-zinc-200 hover:border-blue-500 hover:bg-blue-50/50 disabled:opacity-50 disabled:hover:bg-white disabled:hover:border-zinc-200 transition-all text-left group"
-                title={selectedOrder.status !== "PENDING" ? "Chỉ đơn hàng đang Chờ xác nhận mới có thể chuyển sang Đang giao" : ""}
-              >
-                <Truck className="w-5 h-5 text-blue-500 mr-3.5 group-hover:scale-110 transition-all" />
-                <div>
-                  <div className="font-bold text-sm text-zinc-800">Đang giao hàng</div>
-                  <div className="text-[10px] text-zinc-400 mt-0.5">Chuyển hàng đi và tự động trừ số lượng tồn kho</div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => handleUpdateStatus("COMPLETED")}
-                disabled={selectedOrder.status !== "SHIPPING"}
-                className="w-full flex items-center p-3 rounded border border-zinc-200 hover:border-green-500 hover:bg-green-50/50 disabled:opacity-50 disabled:hover:bg-white disabled:hover:border-zinc-200 transition-all text-left group"
-                title={selectedOrder.status !== "SHIPPING" ? "Chỉ đơn hàng đang Đang giao mới có thể chuyển sang Hoàn thành" : ""}
-              >
-                <Check className="w-5 h-5 text-green-500 mr-3.5 group-hover:scale-110 transition-all" />
-                <div>
-                  <div className="font-bold text-sm text-zinc-800">Hoàn thành</div>
-                  <div className="text-[10px] text-zinc-400 mt-0.5">Khách đã nhận hàng và hoàn tất thanh toán đơn</div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => handleUpdateStatus("CANCELLED")}
-                disabled={selectedOrder.status !== "PENDING"}
-                className="w-full flex items-center p-3 rounded border border-zinc-200 hover:border-red-500 hover:bg-red-50/50 disabled:opacity-50 disabled:hover:bg-white disabled:hover:border-zinc-200 transition-all text-left group"
-                title={selectedOrder.status !== "PENDING" ? "Chỉ đơn hàng chưa gửi đi mới có thể hủy" : ""}
-              >
-                <XCircle className="w-5 h-5 text-red-500 mr-3.5 group-hover:scale-110 transition-all" />
-                <div>
-                  <div className="font-bold text-sm text-zinc-800">Hủy đơn hàng</div>
-                  <div className="text-[10px] text-zinc-400 mt-0.5">Hủy hẳn đơn hàng này, không tiếp tục giao dịch</div>
-                </div>
-              </button>
-            </div>
-            <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex justify-end">
-              <button
-                onClick={() => setIsStatusModalOpen(false)}
-                className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-600 hover:text-zinc-900 border border-zinc-200 bg-white hover:bg-zinc-50 rounded transition-all"
-              >
-                Hủy bỏ
-              </button>
-            </div>
-          </div>
-        </div>
+      {isBatchWaybillOpen && selectedPrintableOrders.length > 0 && (
+        <AdminOrderWaybillModal
+          orders={selectedPrintableOrders}
+          onClose={() => setBatchWaybillOpen(false)}
+        />
       )}
+
+      <AdminCreateOrderModal
+        open={isCreateModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onCreated={(createdOrder) => {
+          setSelectedOrder(createdOrder);
+          void fetchOrders();
+          void fetchSummary();
+        }}
+      />
     </div>
   );
 }
