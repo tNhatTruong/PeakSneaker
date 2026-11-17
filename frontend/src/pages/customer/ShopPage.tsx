@@ -1,463 +1,612 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { SlidersHorizontal, X } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
-import { Search, ChevronDown, SlidersHorizontal, X } from "lucide-react";
 import ProductCard from "../../components/customer/ProductCard";
-import { ProductService, type ProductResponse, type PaginatedResponse } from "../../services/productService";
-import { CategoryService, type CategoryResponse } from "../../services/categoryService";
+import ProductFilterPanel from "../../components/customer/ProductFilterPanel";
 import { BrandService, type Brand } from "../../services/brandService";
+import { CategoryService, type CategoryResponse } from "../../services/categoryService";
+import { ProductService, type PaginatedResponse, type ProductResponse, type ProductFilterOptionResponse } from "../../services/productService";
 import { SilhouetteService, type SilhouetteResponse } from "../../services/silhouetteService";
 
-export default function ShopPage() {
+const NON_SHOE_CATEGORY_SLUGS = new Set(["phu-kien-sneaker", "cham-soc-giay", "cham-soc-ve-sinh-giay"]);
+const SIZE_COLLATOR = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
+const GENDER_LABELS: Record<string, string> = {
+  MEN: "Nam",
+  WOMEN: "Nữ",
+  UNISEX: "Unisex",
+  KIDS: "Trẻ em",
+};
+
+const parseId = (value: string | null): number | undefined => {
+  if (!value) return undefined;
+  const parsedValue = Number.parseInt(value, 10);
+  return Number.isInteger(parsedValue) && parsedValue > 0 ? parsedValue : undefined;
+};
+
+interface ActiveFilterChipProps {
+  label: string;
+  value: string;
+  onRemove: () => void;
+}
+
+function ActiveFilterChip({ label, value, onRemove }: ActiveFilterChipProps): ReactElement {
+  return (
+    <span className="inline-flex min-h-9 items-center border border-zinc-300 bg-white pl-3 text-xs text-zinc-700">
+      <span className="mr-1 font-semibold text-zinc-500">{label}:</span>
+      <span className="max-w-48 truncate font-bold text-zinc-900">{value}</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Xóa bộ lọc ${label}: ${value}`}
+        className="ml-2 flex h-8 w-8 items-center justify-center border-l border-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-white"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </span>
+  );
+}
+
+export default function ShopPage(): ReactElement {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
-
-  // Dữ liệu từ API
   const [products, setProducts] = useState<ProductResponse[]>([]);
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [filterOptions, setFilterOptions] = useState<ProductFilterOptionResponse[]>([]);
   const [silhouettes, setSilhouettes] = useState<SilhouetteResponse[]>([]);
-  
-  // Trạng thái load/phân trang
-  const [isLoading, setIsLoading] = useState(true);
+  const [availableSizes, setAvailableSizes] = useState<string[]>([]);
+  const [areBaseFiltersLoaded, setAreBaseFiltersLoaded] = useState(false);
+  const [loadedSilhouetteScope, setLoadedSilhouetteScope] = useState<string | null>(null);
+  const [loadedProductQuery, setLoadedProductQuery] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
+  const catalogStartRef = useRef<HTMLDivElement>(null);
 
-  // Lấy các giá trị từ URL Params
-  const categoryId = searchParams.get("categoryId");
-  const brandId = searchParams.get("brandId");
-  const silhouetteId = searchParams.get("silhouetteId");
+  const categorySlug = searchParams.get("category");
+  const brandSlug = searchParams.get("brand");
+  const silhouetteSlug = searchParams.get("silhouette");
+  const genderParam = searchParams.get("gender") as 'MEN' | 'WOMEN' | 'UNISEX' | 'KIDS' | null;
+  const selectedGender = genderParam && ['MEN', 'WOMEN', 'UNISEX', 'KIDS'].includes(genderParam) ? genderParam : null;
+  const selectedSize = searchParams.get("shoeSize");
+  const legacyCategoryId = parseId(searchParams.get("categoryId"));
+  const legacyBrandId = parseId(searchParams.get("brandId"));
+  const legacySilhouetteId = parseId(searchParams.get("silhouetteId"));
   const minPrice = searchParams.get("minPrice");
   const maxPrice = searchParams.get("maxPrice");
+  const inStockOnly = searchParams.get("inStockOnly") === "true";
+  const onSale = searchParams.get("onSale") === "true";
   const searchKeyword = searchParams.get("search") || "";
   const sortBy = searchParams.get("sortBy") || "createdAt";
   const sortDirection = searchParams.get("sortDirection") || "desc";
-  const page = parseInt(searchParams.get("page") || "0");
+  const page = Math.max(Number.parseInt(searchParams.get("page") || "0", 10) || 0, 0);
 
-  // Load danh mục & thương hiệu lần đầu
+  const selectedCategory = useMemo(
+    () => categories.find((category) => category.slug === categorySlug || category.id === legacyCategoryId),
+    [categories, categorySlug, legacyCategoryId],
+  );
+  const selectedBrand = useMemo(
+    () => brands.find((brand) => brand.slug === brandSlug || brand.id === legacyBrandId),
+    [brands, brandSlug, legacyBrandId],
+  );
+  const displayedBrands = useMemo(() => {
+    if (!selectedCategory || filterOptions.length === 0) return brands;
+    const categoryBrandIds = new Set(
+      filterOptions
+        .filter((opt) => opt.categoryId === selectedCategory.id && opt.brandId !== null)
+        .map((opt) => opt.brandId as number)
+    );
+    if (categoryBrandIds.size > 0) {
+      return brands.filter((brand) => categoryBrandIds.has(brand.id));
+    }
+    return brands;
+  }, [brands, selectedCategory, filterOptions]);
+  const displayedSilhouettes = useMemo(() => {
+    if (silhouettes.length === 0) return [];
+    if (!selectedCategory || filterOptions.length === 0) return silhouettes;
+    const categorySilhouetteIds = new Set(
+      filterOptions
+        .filter((opt) => opt.categoryId === selectedCategory.id && opt.silhouetteId !== null)
+        .map((opt) => opt.silhouetteId as number)
+    );
+    if (categorySilhouetteIds.size > 0) {
+      return silhouettes.filter((sil) => categorySilhouetteIds.has(sil.id));
+    }
+    return [];
+  }, [silhouettes, selectedCategory, filterOptions]);
+
+  const selectedSilhouette = useMemo(
+    () => displayedSilhouettes.find((silhouette) => silhouette.slug === silhouetteSlug || silhouette.id === legacySilhouetteId),
+    [displayedSilhouettes, silhouetteSlug, legacySilhouetteId],
+  );
+  const showShoeFilters = !selectedCategory || !NON_SHOE_CATEGORY_SLUGS.has(selectedCategory.slug);
+  const showSilhouettes = showShoeFilters;
+  const activeFilterCount = [
+    Boolean(selectedCategory),
+    Boolean(selectedBrand),
+    Boolean(selectedSilhouette),
+    Boolean(selectedGender),
+    Boolean(selectedSize),
+    Boolean(minPrice || maxPrice),
+    Boolean(inStockOnly),
+    Boolean(onSale),
+  ].filter(Boolean).length;
+
+  const hasInvalidFilter = Boolean(
+    ((categorySlug || legacyCategoryId) && !selectedCategory)
+    || ((brandSlug || legacyBrandId) && !selectedBrand)
+    || ((silhouetteSlug || legacySilhouetteId) && !selectedSilhouette),
+  );
+  const silhouetteScope = selectedBrand ? `brand:${selectedBrand.id}` : "all";
+  const areSilhouettesLoaded = loadedSilhouetteScope === silhouetteScope;
+  const productQueryKey = [
+    selectedCategory?.id,
+    selectedBrand?.id,
+    selectedSilhouette?.id,
+    selectedGender,
+    selectedSize,
+    minPrice,
+    maxPrice,
+    inStockOnly,
+    onSale,
+    searchKeyword,
+    sortBy,
+    sortDirection,
+    page,
+  ].join("|");
+  const isProductLoading = !areBaseFiltersLoaded
+    || !areSilhouettesLoaded
+    || (!hasInvalidFilter && loadedProductQuery !== productQueryKey);
+
+  const filteredProducts = useMemo(() => {
+    if (hasInvalidFilter) return [];
+    if (!inStockOnly) return products;
+    return products.filter((p) => (p.totalStock ?? 0) > 0);
+  }, [hasInvalidFilter, inStockOnly, products]);
+
+  const displayedProducts = filteredProducts;
+  const displayedTotalPages = inStockOnly
+    ? Math.ceil(filteredProducts.length / 12) || 1
+    : (hasInvalidFilter ? 0 : totalPages);
+  const displayedTotalElements = inStockOnly
+    ? filteredProducts.length
+    : (hasInvalidFilter ? 0 : totalElements);
+
   useEffect(() => {
-    CategoryService.getAllCategories().then(setCategories).catch(console.error);
-    BrandService.getAllBrands().then(setBrands).catch(console.error);
+    let isActive = true;
+
+    Promise.all([
+      CategoryService.getAllCategories(),
+      BrandService.getAllBrands(),
+      ProductService.getFilterOptions().catch(() => [] as ProductFilterOptionResponse[]),
+    ])
+      .then(([categoryData, brandData, filterOptionData]) => {
+        if (!isActive) return;
+        setCategories(categoryData);
+        setBrands(brandData);
+        setFilterOptions(filterOptionData || []);
+      })
+      .catch(console.error)
+      .finally(() => {
+        if (isActive) setAreBaseFiltersLoaded(true);
+      });
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
-  // Load dòng giày mỗi khi brandId thay đổi
   useEffect(() => {
-    if (brandId) {
-      SilhouetteService.getSilhouettesByBrand(parseInt(brandId))
-        .then(setSilhouettes)
-        .catch(console.error);
-    } else {
-      SilhouetteService.getAllSilhouettes().then(setSilhouettes).catch(console.error);
-    }
-    
-    // Nếu đổi brand thì reset silhouette đang chọn
-    if (brandId) {
-       // Chúng ta không reset trực tiếp trên searchParams ở đây để tránh loop, 
-       // chỉ khi người dùng click đổi brand thì mới reset ở hàm xử lý.
-    }
-  }, [brandId]);
+    if (!areBaseFiltersLoaded) return;
 
-  // Load sản phẩm mỗi khi Params thay đổi
+    let isActive = true;
+    const request = selectedBrand
+      ? SilhouetteService.getSilhouettesByBrand(selectedBrand.id)
+      : SilhouetteService.getAllSilhouettes();
+
+    request
+      .then((data) => {
+        if (!isActive) return;
+        setSilhouettes(data);
+        setLoadedSilhouetteScope(silhouetteScope);
+      })
+      .catch((error: unknown) => {
+        console.error(error);
+        if (!isActive) return;
+        setSilhouettes([]);
+        setLoadedSilhouetteScope(silhouetteScope);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [areBaseFiltersLoaded, selectedBrand, silhouetteScope]);
+
   useEffect(() => {
-    setIsLoading(true);
+    if (!areBaseFiltersLoaded || !showShoeFilters) {
+      setAvailableSizes([]);
+      return;
+    }
+
+    let isActive = true;
+    ProductService.getAvailableSizes({
+      categoryId: selectedCategory?.id,
+      brandId: selectedBrand?.id,
+      silhouetteId: selectedSilhouette?.id,
+    })
+      .then((sizes) => {
+        if (isActive) setAvailableSizes([...sizes].sort(SIZE_COLLATOR.compare));
+      })
+      .catch((error: unknown) => {
+        console.error(error);
+        if (isActive) setAvailableSizes([]);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [areBaseFiltersLoaded, selectedBrand, selectedCategory, selectedSilhouette, showShoeFilters]);
+
+  useEffect(() => {
+    if (!areBaseFiltersLoaded || !areSilhouettesLoaded || hasInvalidFilter) return;
+
+    let isActive = true;
     ProductService.filterProducts({
-      categoryId: categoryId ? parseInt(categoryId) : undefined,
-      brandId: brandId ? parseInt(brandId) : undefined,
-      silhouetteId: silhouetteId ? parseInt(silhouetteId) : undefined,
-      minPrice: minPrice ? parseInt(minPrice) : undefined,
-      maxPrice: maxPrice ? parseInt(maxPrice) : undefined,
+      categoryId: selectedCategory?.id,
+      brandId: selectedBrand?.id,
+      silhouetteId: selectedSilhouette?.id,
+      gender: selectedGender || undefined,
+      onSale: onSale || undefined,
+      variantSize: selectedSize || undefined,
+      minPrice: minPrice ? Number.parseInt(minPrice, 10) : undefined,
+      maxPrice: maxPrice ? Number.parseInt(maxPrice, 10) : undefined,
       search: searchKeyword,
       sortBy,
       sortDirection,
       page,
-      size: 12
+      size: 12,
     })
-      .then((res: PaginatedResponse<ProductResponse>) => {
-        setProducts(res.items);
-        setTotalPages(res.totalPages);
-        setTotalElements(res.totalElements);
+      .then((response: PaginatedResponse<ProductResponse>) => {
+        if (!isActive) return;
+        setProducts(response.items);
+        setTotalPages(response.totalPages);
+        setTotalElements(response.totalElements);
       })
       .catch(console.error)
-      .finally(() => setIsLoading(false));
-  }, [categoryId, brandId, silhouetteId, minPrice, maxPrice, searchKeyword, sortBy, sortDirection, page]);
+      .finally(() => {
+        if (isActive) setLoadedProductQuery(productQueryKey);
+      });
 
-  // Hàm cập nhật query parameter
-  const updateParams = (key: string, value: string | null) => {
-    const newParams = new URLSearchParams(searchParams);
-    if (value) {
-      newParams.set(key, value);
-    } else {
-      newParams.delete(key);
+    return () => {
+      isActive = false;
+    };
+  }, [areBaseFiltersLoaded, areSilhouettesLoaded, hasInvalidFilter, selectedCategory, selectedBrand, selectedSilhouette, selectedGender, selectedSize, minPrice, maxPrice, searchKeyword, sortBy, sortDirection, page, productQueryKey]);
+
+  useEffect(() => {
+    if (!isMobileFilterOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsMobileFilterOpen(false);
+    };
+
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isMobileFilterOpen]);
+
+  const scrollToCatalog = useCallback(() => {
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    catalogStartRef.current?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+  }, []);
+
+  const updateParams = useCallback((key: string, value: string | null) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (value) nextParams.set(key, value); else nextParams.delete(key);
+    if (key !== "page") nextParams.set("page", "0");
+
+    if (key === "category") {
+      nextParams.delete("categoryId");
+      nextParams.delete("silhouette");
+      nextParams.delete("silhouetteId");
+      nextParams.delete("shoeSize");
+      if (value && filterOptions.length > 0) {
+        const targetCategory = categories.find((c) => c.slug === value);
+        if (targetCategory && selectedBrand) {
+          const validBrandIds = new Set(
+            filterOptions
+              .filter((opt) => opt.categoryId === targetCategory.id && opt.brandId !== null)
+              .map((opt) => opt.brandId as number)
+          );
+          if (validBrandIds.size > 0 && !validBrandIds.has(selectedBrand.id)) {
+            nextParams.delete("brand");
+            nextParams.delete("brandId");
+          }
+        }
+      }
     }
-    // Đổi filter thì reset về trang 0
-    if (key !== "page") {
-      newParams.set("page", "0");
+    if (key === "brand") {
+      nextParams.delete("brandId");
+      nextParams.delete("silhouette");
+      nextParams.delete("silhouetteId");
+      nextParams.delete("shoeSize");
     }
-    
-    // Nếu đổi brand thì reset silhouette
-    if (key === "brandId") {
-      newParams.delete("silhouetteId");
+    if (key === "silhouette") {
+      nextParams.delete("silhouetteId");
+      nextParams.delete("shoeSize");
     }
-    
-    setSearchParams(newParams);
-  };
 
-  const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const kw = formData.get("keyword") as string;
-    updateParams("search", kw);
-  };
+    setSearchParams(nextParams);
+    requestAnimationFrame(scrollToCatalog);
+  }, [scrollToCatalog, searchParams, setSearchParams]);
 
-  const handleSort = (sort: string, dir: string) => {
-    const newParams = new URLSearchParams(searchParams);
-    newParams.set("sortBy", sort);
-    newParams.set("sortDirection", dir);
-    newParams.set("page", "0");
-    setSearchParams(newParams);
-  };
+  const updatePriceRange = useCallback((minimum: string | null, maximum: string | null) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (minimum) nextParams.set("minPrice", minimum); else nextParams.delete("minPrice");
+    if (maximum) nextParams.set("maxPrice", maximum); else nextParams.delete("maxPrice");
+    nextParams.set("page", "0");
+    setSearchParams(nextParams);
+    requestAnimationFrame(scrollToCatalog);
+  }, [scrollToCatalog, searchParams, setSearchParams]);
 
-  const getSortLabel = () => {
-    if (sortBy === "createdAt" && sortDirection === "desc") return "Mới nhất";
-    if (sortBy === "isFeatured" && sortDirection === "desc") return "Bán chạy nhất";
-    if (sortBy === "basePrice" && sortDirection === "asc") return "Giá tăng dần";
-    if (sortBy === "basePrice" && sortDirection === "desc") return "Giá giảm dần";
-    return "Sắp xếp";
-  };
+  const resetProductFilters = useCallback(() => {
+    const nextParams = new URLSearchParams(searchParams);
+    ["category", "categoryId", "brand", "brandId", "silhouette", "silhouetteId", "shoeSize", "minPrice", "maxPrice", "featured", "tag", "onSale"].forEach((key) => nextParams.delete(key));
+    nextParams.set("page", "0");
+    setSearchParams(nextParams);
+    requestAnimationFrame(scrollToCatalog);
+  }, [scrollToCatalog, searchParams, setSearchParams]);
+
+  const clearAllDiscoveryState = useCallback(() => {
+    const nextParams = new URLSearchParams();
+    nextParams.set("sortBy", sortBy === "isFeatured" ? "totalSold" : sortBy);
+    nextParams.set("sortDirection", sortDirection);
+    setSearchParams(nextParams);
+    requestAnimationFrame(scrollToCatalog);
+  }, [scrollToCatalog, setSearchParams, sortBy, sortDirection]);
+
+  const currentSortValue =
+    (sortBy === "isFeatured" || sortBy === "totalSold") && sortDirection === "desc"
+      ? "totalSold:desc"
+      : `${sortBy}:${sortDirection}`;
+
+  const handleSortChange = useCallback((value: string) => {
+    const [nextSortBy, nextSortDirection] = value.split(":");
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("sortBy", nextSortBy);
+    nextParams.set("sortDirection", nextSortDirection);
+    nextParams.delete("featured");
+    nextParams.delete("tag");
+    nextParams.set("page", "0");
+    setSearchParams(nextParams);
+    requestAnimationFrame(scrollToCatalog);
+  }, [scrollToCatalog, searchParams, setSearchParams]);
+
+  const priceLabel = minPrice === "5000000"
+    ? "Trên 5.000.000đ"
+    : minPrice === "2000000" && maxPrice === "5000000"
+      ? "2.000.000đ đến 5.000.000đ"
+      : maxPrice === "2000000"
+        ? "Dưới 2.000.000đ"
+        : "Khoảng giá";
 
   return (
-    <div className="container mx-auto px-4 md:px-8 py-10">
-      {/* Page Header & Top Bar */}
-      <div className="mb-8 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 text-center md:text-left">
+    <div className="container mx-auto px-4 py-10 md:px-8">
+      <div className="mb-8 flex flex-col gap-6 text-center md:text-left lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-zinc-900">
-            Khám Phá Sản Phẩm
+          <h1 className="text-3xl font-black uppercase tracking-tighter text-zinc-900 sm:text-4xl lg:text-5xl">
+            {searchKeyword ? `Kết Quả Cho “${searchKeyword}”` : "Khám Phá Sản Phẩm"}
           </h1>
-          <p className="text-zinc-500 mt-3 max-w-2xl">
-            Tất cả những phiên bản mới nhất, độc quyền và giới hạn được tổng hợp tại đây.
+          <p className="mt-3 max-w-2xl text-zinc-500">
+            {searchKeyword
+              ? isProductLoading
+                ? "Đang tìm sản phẩm phù hợp..."
+                : `${displayedTotalElements} sản phẩm được tìm thấy. Sử dụng bộ lọc để thu hẹp kết quả.`
+              : "Tất cả những phiên bản mới nhất, độc quyền và giới hạn được tổng hợp tại đây."}
           </p>
         </div>
 
-        {/* Top Bar: Search & Sort (Desktop) */}
-        <div className="hidden lg:flex items-center space-x-4">
-          <form onSubmit={handleSearch} className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-zinc-400" />
-            <input
-              name="keyword"
-              defaultValue={searchKeyword}
-              type="text"
-              placeholder="Tìm kiếm giày..."
-              className="pl-10 pr-4 py-2 bg-zinc-100 border-transparent focus:bg-white focus:border-zinc-900 focus:ring-0 text-sm w-64 outline-none transition-all"
-            />
-          </form>
-          
-          <div className="relative group">
-            <button className="flex items-center space-x-2 border border-zinc-200 px-4 py-2 text-sm font-medium bg-white min-w-[140px] justify-between">
-              <span>{getSortLabel()}</span>
-              <ChevronDown className="h-4 w-4" />
-            </button>
-            <div className="absolute right-0 mt-2 w-48 bg-white border border-zinc-200 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
-              <ul className="py-2">
-                <li onClick={() => handleSort("createdAt", "desc")} className={`px-4 py-2 text-sm cursor-pointer ${sortBy === "createdAt" ? "text-zinc-900 font-bold bg-zinc-50" : "text-zinc-700 hover:bg-zinc-100"}`}>Mới nhất</li>
-                <li onClick={() => handleSort("isFeatured", "desc")} className={`px-4 py-2 text-sm cursor-pointer ${sortBy === "isFeatured" ? "text-zinc-900 font-bold bg-zinc-50" : "text-zinc-700 hover:bg-zinc-100"}`}>Bán chạy nhất</li>
-                <li onClick={() => handleSort("basePrice", "asc")} className={`px-4 py-2 text-sm cursor-pointer ${sortBy === "basePrice" && sortDirection === "asc" ? "text-zinc-900 font-bold bg-zinc-50" : "text-zinc-700 hover:bg-zinc-100"}`}>Giá tăng dần</li>
-                <li onClick={() => handleSort("basePrice", "desc")} className={`px-4 py-2 text-sm cursor-pointer ${sortBy === "basePrice" && sortDirection === "desc" ? "text-zinc-900 font-bold bg-zinc-50" : "text-zinc-700 hover:bg-zinc-100"}`}>Giá giảm dần</li>
-              </ul>
-            </div>
-          </div>
-        </div>
+        <label className="hidden items-center gap-3 lg:flex">
+          <span className="text-xs font-bold uppercase tracking-[0.14em] text-zinc-500">Sắp xếp</span>
+          <select
+            value={currentSortValue}
+            onChange={(event) => handleSortChange(event.target.value)}
+            className="h-11 min-w-48 border border-zinc-300 bg-white px-3 text-sm font-bold text-zinc-900 outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900"
+          >
+            <option value="createdAt:desc">Mới nhất</option>
+            <option value="totalSold:desc">Bán chạy nhất</option>
+            <option value="basePrice:asc">Giá tăng dần</option>
+            <option value="basePrice:desc">Giá giảm dần</option>
+          </select>
+        </label>
       </div>
 
-      {/* Main Layout: Sidebar + Grid */}
-      <div className="flex flex-col lg:flex-row gap-10">
-        {/* Mobile Filter Toggle */}
-        <div className="lg:hidden flex justify-between items-center border-b border-zinc-200 pb-4">
-          <button
-            onClick={() => setIsMobileFilterOpen(!isMobileFilterOpen)}
-            className="flex items-center space-x-2 font-bold uppercase text-sm text-zinc-900"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            <span>Lọc Sản Phẩm</span>
-          </button>
-          <span className="text-sm text-zinc-500">{totalElements} Kết quả</span>
-        </div>
-
-        {/* Sidebar Filters */}
-        <aside className={`${isMobileFilterOpen ? "block" : "hidden"} lg:block w-full lg:w-1/4 space-y-8`}>
-          
-          {/* Categories */}
-          <div>
-            <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-900 mb-4 flex items-center justify-between">
-              Danh mục <ChevronDown className="h-4 w-4 lg:hidden" />
-            </h3>
-            <ul className="space-y-3">
-              <li>
-                <label className="flex items-center space-x-3 cursor-pointer">
-                  <input 
-                    type="radio" 
-                    name="category" 
-                    checked={!categoryId} 
-                    onChange={() => updateParams("categoryId", null)}
-                    className="form-radio h-4 w-4 text-zinc-900 border-zinc-300 focus:ring-zinc-900" 
-                  />
-                  <span className="text-sm text-zinc-600 hover:text-zinc-900">Tất cả</span>
-                </label>
-              </li>
-              {categories.map(cat => (
-                <li key={cat.id}>
-                  <label className="flex items-center space-x-3 cursor-pointer">
-                    <input 
-                      type="radio" 
-                      name="category" 
-                      checked={categoryId === cat.id.toString()}
-                      onChange={() => updateParams("categoryId", cat.id.toString())}
-                      className="form-radio h-4 w-4 text-zinc-900 border-zinc-300 focus:ring-zinc-900" 
-                    />
-                    <span className="text-sm text-zinc-600 hover:text-zinc-900">{cat.name}</span>
-                  </label>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <hr className="border-zinc-100" />
-
-          {/* Brands */}
-          <div>
-            <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-900 mb-4">Thương hiệu</h3>
-            <ul className="space-y-3">
-              <li>
-                <label className="flex items-center space-x-3 cursor-pointer">
-                  <input 
-                    type="radio" 
-                    name="brand" 
-                    checked={!brandId}
-                    onChange={() => updateParams("brandId", null)}
-                    className="form-radio h-4 w-4 text-zinc-900 border-zinc-300 focus:ring-zinc-900" 
-                  />
-                  <span className="text-sm text-zinc-600 hover:text-zinc-900">Tất cả</span>
-                </label>
-              </li>
-              {brands.map(brand => (
-                <li key={brand.id}>
-                  <label className="flex items-center space-x-3 cursor-pointer">
-                    <input 
-                      type="radio" 
-                      name="brand" 
-                      checked={brandId === brand.id.toString()}
-                      onChange={() => updateParams("brandId", brand.id.toString())}
-                      className="form-radio h-4 w-4 text-zinc-900 border-zinc-300 focus:ring-zinc-900" 
-                    />
-                    <span className="text-sm text-zinc-600 hover:text-zinc-900">{brand.name}</span>
-                  </label>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <hr className="border-zinc-100" />
-
-          {/* Silhouettes */}
-          {silhouettes.length > 0 && (
-            <>
-              <div>
-                <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-900 mb-4">Dòng giày</h3>
-                <ul className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                  <li>
-                    <label className="flex items-center space-x-3 cursor-pointer">
-                      <input 
-                        type="radio" 
-                        name="silhouette" 
-                        checked={!silhouetteId}
-                        onChange={() => updateParams("silhouetteId", null)}
-                        className="form-radio h-4 w-4 text-zinc-900 border-zinc-300 focus:ring-zinc-900" 
-                      />
-                      <span className="text-sm text-zinc-600 hover:text-zinc-900">Tất cả</span>
-                    </label>
-                  </li>
-                  {silhouettes.map(sil => (
-                    <li key={sil.id}>
-                      <label className="flex items-center space-x-3 cursor-pointer">
-                        <input 
-                          type="radio" 
-                          name="silhouette" 
-                          checked={silhouetteId === sil.id.toString()}
-                          onChange={() => updateParams("silhouetteId", sil.id.toString())}
-                          className="form-radio h-4 w-4 text-zinc-900 border-zinc-300 focus:ring-zinc-900" 
-                        />
-                        <span className="text-sm text-zinc-600 hover:text-zinc-900">{sil.name}</span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <hr className="border-zinc-100" />
-            </>
+      <div className="mb-7 grid grid-cols-[1fr_auto] border-y border-zinc-200 lg:hidden">
+        <button
+          type="button"
+          onClick={() => setIsMobileFilterOpen(true)}
+          className="flex h-14 items-center gap-2 border-r border-zinc-200 px-1 text-sm font-black uppercase tracking-wide text-zinc-900 active:translate-y-px"
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+          Bộ lọc
+          {activeFilterCount > 0 && (
+            <span className="flex h-5 min-w-5 items-center justify-center bg-zinc-900 px-1 text-[11px] text-white">{activeFilterCount}</span>
           )}
+        </button>
+        <select
+          aria-label="Sắp xếp sản phẩm"
+          value={currentSortValue}
+          onChange={(event) => handleSortChange(event.target.value)}
+          className="h-14 max-w-40 bg-white px-3 text-sm font-bold text-zinc-900 outline-none"
+        >
+          <option value="createdAt:desc">Mới nhất</option>
+          <option value="totalSold:desc">Bán chạy nhất</option>
+          <option value="basePrice:asc">Giá tăng dần</option>
+          <option value="basePrice:desc">Giá giảm dần</option>
+        </select>
+      </div>
 
-          {/* Price Range */}
-          <div>
-            <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-900 mb-4">Mức giá</h3>
-            <ul className="space-y-3">
-              <li>
-                <label className="flex items-center space-x-3 cursor-pointer">
-                  <input 
-                    type="radio" 
-                    name="price" 
-                    checked={!minPrice && !maxPrice}
-                    onChange={() => { updateParams("minPrice", null); updateParams("maxPrice", null); }}
-                    className="form-radio h-4 w-4 text-zinc-900 border-zinc-300 focus:ring-zinc-900" 
-                  />
-                  <span className="text-sm text-zinc-600 hover:text-zinc-900">Tất cả</span>
-                </label>
-              </li>
-              <li>
-                <label className="flex items-center space-x-3 cursor-pointer">
-                  <input 
-                    type="radio" 
-                    name="price" 
-                    checked={maxPrice === "2000000"}
-                    onChange={() => { updateParams("minPrice", null); updateParams("maxPrice", "2000000"); }}
-                    className="form-radio h-4 w-4 text-zinc-900 border-zinc-300 focus:ring-zinc-900" 
-                  />
-                  <span className="text-sm text-zinc-600 hover:text-zinc-900">Dưới 2.000.000đ</span>
-                </label>
-              </li>
-              <li>
-                <label className="flex items-center space-x-3 cursor-pointer">
-                  <input 
-                    type="radio" 
-                    name="price" 
-                    checked={minPrice === "2000000" && maxPrice === "5000000"}
-                    onChange={() => { updateParams("minPrice", "2000000"); updateParams("maxPrice", "5000000"); }}
-                    className="form-radio h-4 w-4 text-zinc-900 border-zinc-300 focus:ring-zinc-900" 
-                  />
-                  <span className="text-sm text-zinc-600 hover:text-zinc-900">2.000.000đ - 5.000.000đ</span>
-                </label>
-              </li>
-              <li>
-                <label className="flex items-center space-x-3 cursor-pointer">
-                  <input 
-                    type="radio" 
-                    name="price" 
-                    checked={minPrice === "5000000" && !maxPrice}
-                    onChange={() => { updateParams("minPrice", "5000000"); updateParams("maxPrice", null); }}
-                    className="form-radio h-4 w-4 text-zinc-900 border-zinc-300 focus:ring-zinc-900" 
-                  />
-                  <span className="text-sm text-zinc-600 hover:text-zinc-900">Trên 5.000.000đ</span>
-                </label>
-              </li>
-            </ul>
-          </div>
-        </aside>
+      {isMobileFilterOpen && (
+        <ProductFilterPanel
+          mobile
+          categories={categories}
+          brands={displayedBrands}
+          silhouettes={displayedSilhouettes}
+          sizes={availableSizes}
+          selectedCategory={selectedCategory}
+          selectedBrand={selectedBrand}
+          selectedSilhouette={selectedSilhouette}
+          selectedGender={selectedGender}
+          selectedSize={selectedSize}
+          minPrice={minPrice}
+          maxPrice={maxPrice}
+          inStockOnly={inStockOnly}
+          onSale={onSale}
+          activeFilterCount={activeFilterCount}
+          resultCount={displayedTotalElements}
+          showSilhouettes={showSilhouettes}
+          showShoeFilters={showShoeFilters}
+          onCategoryChange={(slug) => updateParams("category", slug)}
+          onBrandChange={(slug) => updateParams("brand", slug)}
+          onSilhouetteChange={(slug) => updateParams("silhouette", slug)}
+          onGenderChange={(gender) => updateParams("gender", gender)}
+          onSizeChange={(size) => updateParams("shoeSize", size)}
+          onPriceChange={updatePriceRange}
+          onInStockOnlyChange={(val) => updateParams("inStockOnly", val ? "true" : null)}
+          onSaleChange={(val) => updateParams("onSale", val ? "true" : null)}
+          onReset={resetProductFilters}
+          onClose={() => {
+            setIsMobileFilterOpen(false);
+            requestAnimationFrame(scrollToCatalog);
+          }}
+        />
+      )}
 
-        {/* Product Grid Area */}
-        <div className="flex-1">
-          {/* Product Count (Mobile/Tablet fallback) */}
-          <div className="lg:hidden mb-6 text-sm font-medium text-zinc-500">
-            {totalElements} Kết quả
+      <div className="flex gap-10 lg:scroll-mt-28 xl:gap-14" ref={catalogStartRef}>
+        <ProductFilterPanel
+          categories={categories}
+          brands={displayedBrands}
+          silhouettes={displayedSilhouettes}
+          sizes={availableSizes}
+          selectedCategory={selectedCategory}
+          selectedBrand={selectedBrand}
+          selectedSilhouette={selectedSilhouette}
+          selectedGender={selectedGender}
+          selectedSize={selectedSize}
+          minPrice={minPrice}
+          maxPrice={maxPrice}
+          inStockOnly={inStockOnly}
+          onSale={onSale}
+          activeFilterCount={activeFilterCount}
+          resultCount={displayedTotalElements}
+          showSilhouettes={showSilhouettes}
+          showShoeFilters={showShoeFilters}
+          onCategoryChange={(slug) => updateParams("category", slug)}
+          onBrandChange={(slug) => updateParams("brand", slug)}
+          onSilhouetteChange={(slug) => updateParams("silhouette", slug)}
+          onGenderChange={(gender) => updateParams("gender", gender)}
+          onSizeChange={(size) => updateParams("shoeSize", size)}
+          onPriceChange={updatePriceRange}
+          onInStockOnlyChange={(val) => updateParams("inStockOnly", val ? "true" : null)}
+          onSaleChange={(val) => updateParams("onSale", val ? "true" : null)}
+          onReset={resetProductFilters}
+        />
+
+        <div className="min-h-[900px] min-w-0 flex-1 [overflow-anchor:none]">
+          <div className="mb-6 flex items-center justify-between border-b border-zinc-200 pb-4">
+            <p className="text-sm font-semibold text-zinc-500">
+              <span className="font-black text-zinc-900">{displayedTotalElements}</span> sản phẩm
+            </p>
+            {activeFilterCount > 0 && (
+              <button type="button" onClick={resetProductFilters} className="text-xs font-bold text-zinc-500 underline decoration-zinc-300 underline-offset-4 hover:text-zinc-900 lg:hidden">
+                Đặt lại bộ lọc
+              </button>
+            )}
           </div>
-          
-          {/* Active Filters Display */}
-          {(searchKeyword || categoryId || brandId || silhouetteId || minPrice || maxPrice) && (
-            <div className="flex flex-wrap gap-2 mb-6">
-              {searchKeyword && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-800">
-                  Từ khóa: {searchKeyword}
-                  <button onClick={() => updateParams("search", null)} className="ml-2 hover:text-red-500"><X className="h-3 w-3" /></button>
-                </span>
-              )}
-              {categoryId && categories.find(c => c.id.toString() === categoryId) && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-800">
-                  {categories.find(c => c.id.toString() === categoryId)?.name}
-                  <button onClick={() => updateParams("categoryId", null)} className="ml-2 hover:text-red-500"><X className="h-3 w-3" /></button>
-                </span>
-              )}
-              {brandId && brands.find(b => b.id.toString() === brandId) && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-800">
-                  {brands.find(b => b.id.toString() === brandId)?.name}
-                  <button onClick={() => updateParams("brandId", null)} className="ml-2 hover:text-red-500"><X className="h-3 w-3" /></button>
-                </span>
-              )}
-              {silhouetteId && silhouettes.find(s => s.id.toString() === silhouetteId) && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-800">
-                  {silhouettes.find(s => s.id.toString() === silhouetteId)?.name}
-                  <button onClick={() => updateParams("silhouetteId", null)} className="ml-2 hover:text-red-500"><X className="h-3 w-3" /></button>
-                </span>
-              )}
-              {(minPrice || maxPrice) && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-800">
-                  {minPrice ? `${parseInt(minPrice).toLocaleString()}đ` : '0đ'} - {maxPrice ? `${parseInt(maxPrice).toLocaleString()}đ` : 'Trở lên'}
-                  <button onClick={() => { updateParams("minPrice", null); updateParams("maxPrice", null); }} className="ml-2 hover:text-red-500"><X className="h-3 w-3" /></button>
-                </span>
+
+          {(searchKeyword || selectedCategory || selectedBrand || selectedSilhouette || selectedGender || selectedSize || minPrice || maxPrice || inStockOnly || onSale) && (
+            <div className="mb-8 flex flex-wrap items-center gap-2">
+              {searchKeyword && <ActiveFilterChip label="Từ khóa" value={searchKeyword} onRemove={() => updateParams("search", null)} />}
+              {selectedCategory && <ActiveFilterChip label="Danh mục" value={selectedCategory.name} onRemove={() => updateParams("category", null)} />}
+              {selectedBrand && <ActiveFilterChip label="Thương hiệu" value={selectedBrand.name} onRemove={() => updateParams("brand", null)} />}
+              {selectedSilhouette && <ActiveFilterChip label="Dòng sản phẩm" value={selectedSilhouette.name} onRemove={() => updateParams("silhouette", null)} />}
+              {selectedGender && <ActiveFilterChip label="Giới tính" value={GENDER_LABELS[selectedGender] || selectedGender} onRemove={() => updateParams("gender", null)} />}
+              {selectedSize && <ActiveFilterChip label="Kích thước" value={`Size ${selectedSize}`} onRemove={() => updateParams("shoeSize", null)} />}
+              {(minPrice || maxPrice) && <ActiveFilterChip label="Mức giá" value={priceLabel} onRemove={() => updatePriceRange(null, null)} />}
+              {inStockOnly && <ActiveFilterChip label="Tình trạng" value="Chỉ còn hàng" onRemove={() => updateParams("inStockOnly", null)} />}
+              {onSale && <ActiveFilterChip label="Khuyến mãi" value="Đang giảm giá" onRemove={() => updateParams("onSale", null)} />}
+              {(searchKeyword || activeFilterCount > 0) && (
+                <button type="button" onClick={clearAllDiscoveryState} className="min-h-9 px-2 text-xs font-bold text-zinc-500 underline decoration-zinc-300 underline-offset-4 hover:text-zinc-900">
+                  Xóa tất cả
+                </button>
               )}
             </div>
           )}
 
-          {/* Grid */}
-          {isLoading ? (
-            <div className="flex justify-center items-center py-20">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-zinc-900"></div>
+          {isProductLoading ? (
+            <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 xl:grid-cols-3" aria-label="Đang tải sản phẩm">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="animate-pulse">
+                  <div className="aspect-square bg-zinc-100" />
+                  <div className="mt-4 h-3 w-20 bg-zinc-100" />
+                  <div className="mt-3 h-4 w-4/5 bg-zinc-100" />
+                  <div className="mt-3 h-4 w-28 bg-zinc-100" />
+                </div>
+              ))}
             </div>
-          ) : products.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-10">
-              {products.map((product) => (
-                <ProductCard 
-                  key={product.id} 
+          ) : displayedProducts.length > 0 ? (
+            <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 xl:grid-cols-3">
+              {displayedProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
                   id={product.id.toString()}
                   name={product.name}
-                  price={product.basePrice}
-                  category={product.brand?.name} // Sử dụng tên thương hiệu làm tag
+                  price={product.price ?? product.basePrice}
+                  basePrice={product.basePrice}
+                  discountPercent={product.discountPercent}
+                  totalStock={product.totalStock}
+                  totalSold={product.totalSold}
+                  isNew={product.isNew}
+                  isFeatured={product.isFeatured}
+                  category={product.brand?.name}
                   imageUrl={product.defaultImageUrl}
                 />
               ))}
             </div>
           ) : (
-            <div className="text-center py-20">
-              <p className="text-zinc-500 mb-4">Không tìm thấy sản phẩm nào phù hợp với bộ lọc.</p>
-              <button 
-                onClick={() => setSearchParams({})}
-                className="px-6 py-2 bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800"
-              >
-                Xóa bộ lọc
+            <div className="border-y border-zinc-200 py-20 text-center">
+              <p className="text-xl font-black uppercase tracking-tight text-zinc-900">Không có sản phẩm phù hợp</p>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-500">Hãy bỏ bớt một vài điều kiện hoặc xóa toàn bộ bộ lọc để xem lại danh sách sản phẩm.</p>
+              <button type="button" onClick={clearAllDiscoveryState} className="mt-6 h-11 bg-zinc-900 px-6 text-sm font-bold text-white hover:bg-zinc-800 active:translate-y-px">
+                Xóa tất cả bộ lọc
               </button>
             </div>
           )}
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-16 flex justify-center">
-              <div className="flex space-x-1">
-                <button 
-                  onClick={() => updateParams("page", (page - 1).toString())}
-                  disabled={page === 0}
-                  className="px-4 py-2 border border-zinc-200 text-sm font-medium text-zinc-500 hover:bg-zinc-100 disabled:opacity-50 disabled:hover:bg-white"
-                >
-                  &larr; Prev
+          {displayedTotalPages > 1 && (
+            <nav className="mt-16 flex justify-center" aria-label="Phân trang sản phẩm">
+              <div className="flex">
+                <button type="button" onClick={() => updateParams("page", (page - 1).toString())} disabled={page === 0} className="h-11 border border-zinc-200 px-4 text-sm font-bold text-zinc-600 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40">
+                  Trước
                 </button>
-                
-                {Array.from({ length: totalPages }).map((_, i) => (
-                  <button 
-                    key={i}
-                    onClick={() => updateParams("page", i.toString())}
-                    className={`px-4 py-2 border border-zinc-200 text-sm font-medium ${
-                      page === i 
-                        ? "bg-zinc-900 text-white" 
-                        : "text-zinc-700 hover:bg-zinc-100"
-                    }`}
+                {Array.from({ length: displayedTotalPages }).map((_, index) => (
+                  <button
+                    type="button"
+                    key={index}
+                    onClick={() => updateParams("page", index.toString())}
+                    aria-current={page === index ? "page" : undefined}
+                    className={`h-11 min-w-11 border-y border-r border-zinc-200 text-sm font-bold ${page === index ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100"}`}
                   >
-                    {i + 1}
+                    {index + 1}
                   </button>
                 ))}
-                
-                <button 
-                  onClick={() => updateParams("page", (page + 1).toString())}
-                  disabled={page >= totalPages - 1}
-                  className="px-4 py-2 border border-zinc-200 text-sm font-medium text-zinc-500 hover:bg-zinc-100 disabled:opacity-50 disabled:hover:bg-white"
-                >
-                  Next &rarr;
+                <button type="button" onClick={() => updateParams("page", (page + 1).toString())} disabled={page >= displayedTotalPages - 1} className="h-11 border-y border-r border-zinc-200 px-4 text-sm font-bold text-zinc-600 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40">
+                  Sau
                 </button>
               </div>
-            </div>
+            </nav>
           )}
         </div>
       </div>
