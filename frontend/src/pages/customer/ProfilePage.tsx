@@ -1,9 +1,10 @@
-import { User, Package, MapPin, Settings, Loader2 } from "lucide-react";
+import { User, Package, MapPin, Settings, Loader2, ShieldCheck } from "lucide-react";
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import OrderHistoryPage from "./OrderHistoryPage";
 import AddressBookTab from "./AddressBookTab";
 import AccountSettingsTab from "./AccountSettingsTab";
-import { AuthService, type UserResponse } from "../../services/authService";
+import { AuthService, isStaffOrAdminRole, getRoleDisplayName, type UserResponse } from "../../services/authService";
 import toast from "react-hot-toast";
 
 export default function ProfilePage() {
@@ -65,11 +66,11 @@ export default function ProfilePage() {
   }
   
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="flex flex-col md:flex-row gap-8">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+      <div className="flex flex-col gap-8 lg:flex-row">
         
         {/* Sidebar */}
-        <div className="w-full md:w-64 flex-shrink-0">
+        <div className="w-full flex-shrink-0 lg:w-64">
           <div className="bg-zinc-50 p-6 rounded-xl border border-zinc-200">
             <div className="flex items-center space-x-4 mb-6">
               <div className="w-12 h-12 bg-black text-white rounded-full flex items-center justify-center font-bold text-lg uppercase">
@@ -77,9 +78,31 @@ export default function ProfilePage() {
               </div>
               <div>
                 <h3 className="font-bold text-zinc-900">{user?.fullName || "Người dùng"}</h3>
-                <p className="text-xs text-zinc-500 uppercase font-semibold mt-0.5">{user?.role === 'ADMIN' ? 'Quản trị viên' : 'Khách hàng'}</p>
+                {(() => {
+
+                  const isAdmin = isStaffOrAdminRole(user?.role);
+                  return (
+                    <span className={`inline-block text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded mt-1 ${isAdmin ? 'bg-amber-100 text-amber-800' : 'bg-zinc-200 text-zinc-700'}`}>
+                      {isAdmin ? getRoleDisplayName(user?.role) : 'Khách hàng'}
+                    </span>
+                  );
+                })()}
               </div>
             </div>
+
+            {(() => {
+
+              const isAdmin = isStaffOrAdminRole(user?.role);
+              return isAdmin ? (
+                <Link
+                  to="/admin/dashboard"
+                  className="mb-4 flex items-center justify-center gap-2 w-full py-2.5 px-3 bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-xs uppercase tracking-wider rounded-lg transition-colors shadow-sm"
+                >
+                  <ShieldCheck className="w-4 h-4 text-zinc-950" />
+                  <span>Vào Trang Quản Trị</span>
+                </Link>
+              ) : null;
+            })()}
             
             <nav className="space-y-2">
               <button onClick={() => setActiveTab("info")} className={`w-full flex items-center px-4 py-2.5 text-sm font-medium rounded-md transition-colors ${activeTab === 'info' ? 'bg-black text-white' : 'text-zinc-600 hover:bg-zinc-100'}`}>
@@ -133,7 +156,7 @@ export default function ProfilePage() {
           
           {activeTab === 'orders' && (
             <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
-              <div className="scale-95 origin-top">
+              <div>
                 <OrderHistoryPage />
               </div>
             </div>

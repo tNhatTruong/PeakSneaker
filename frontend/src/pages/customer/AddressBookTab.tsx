@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, MapPin, Check, Loader2 } from "lucide-react";
+import { Plus, MapPin, Check, Loader2 } from "lucide-react";
 import { getAddresses, createAddress, updateAddress, deleteAddress } from "../../services/addressService";
 import type { AddressResponse, AddressRequest } from "../../services/addressService";
 import { getProvinces, getDistricts, getWards } from "../../services/shippingService";
