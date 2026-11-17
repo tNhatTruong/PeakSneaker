@@ -21,7 +21,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/admin/batches")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_ADMIN', 'ADMIN', 'ROLE_WAREHOUSE', 'WAREHOUSE', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER')")
+@PreAuthorize("hasAnyAuthority('INVENTORY_VIEW', 'INVENTORY_IMPORT', 'INVENTORY_ADJUST', 'INVENTORY_FORECAST', 'AUDIT_LOG_VIEW', 'ROLE_SUPER_ADMIN', 'SUPER_ADMIN', 'ROLE_ADMIN', 'ADMIN', 'ROLE_WAREHOUSE', 'WAREHOUSE', 'ROLE_STAFF_MANAGER', 'STAFF_MANAGER')")
 public class AdminBatchController {
 
     private final InventoryService inventoryService;

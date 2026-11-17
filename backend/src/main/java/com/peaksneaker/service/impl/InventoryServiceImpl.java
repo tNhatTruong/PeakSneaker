@@ -476,20 +476,38 @@ public class InventoryServiceImpl implements InventoryService {
         InventoryBatch batch = inventoryBatchRepository.findById(batchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Lô hàng", "id", batchId));
 
+        boolean currentlyQuarantined = Boolean.TRUE.equals(batch.getIsQuarantined());
         batch.setIsQuarantined(isQuarantined);
         batch.setQuarantineReason(isQuarantined ? reason : null);
         InventoryBatch saved = inventoryBatchRepository.save(batch);
 
-        ProductVariant variant = batch.getVariant();
-        String actionText = isQuarantined ? "PHONG TỎA LÔ HÀNG" : "GIẢI PHÓNG PHONG TỎA";
+        ProductVariant variant = productVariantRepository.findByIdWithLock(batch.getVariant().getId())
+                .orElse(batch.getVariant());
+        int batchRemaining = batch.getQuantityRemaining() != null ? batch.getQuantityRemaining() : 0;
+        int quantityChanged = 0;
+
+        if (currentlyQuarantined != isQuarantined && batchRemaining > 0 && variant != null) {
+            int currentStock = variant.getStockQuantity() != null ? variant.getStockQuantity() : 0;
+            if (isQuarantined) {
+                int deducted = Math.min(currentStock, batchRemaining);
+                variant.setStockQuantity(Math.max(0, currentStock - deducted));
+                quantityChanged = -deducted;
+            } else {
+                variant.setStockQuantity(currentStock + batchRemaining);
+                quantityChanged = batchRemaining;
+            }
+            productVariantRepository.save(variant);
+        }
+
+        String actionText = isQuarantined ? "PHONG TỎA LÔ HÀNG" : "GIẢI PHÓA PHONG TỎA";
         String note = String.format("[%s] Mã lô: %s. Lý do: %s. Tồn còn lại của lô: %d đôi.",
-                actionText, batch.getBatchCode(), (reason != null ? reason : "Không có ghi chú"), batch.getQuantityRemaining());
+                actionText, batch.getBatchCode(), (reason != null ? reason : "Không có ghi chú"), batchRemaining);
 
         InventoryAuditLog auditLog = InventoryAuditLog.builder()
                 .variant(variant)
                 .changeType(isQuarantined ? InventoryChangeType.DEFECT : InventoryChangeType.ADJUSTMENT)
-                .quantityChanged(0)
-                .balanceAfter(variant.getStockQuantity())
+                .quantityChanged(quantityChanged)
+                .balanceAfter(variant != null ? variant.getStockQuantity() : 0)
                 .reason(note)
                 .performedBy(actor != null ? actor : resolveCurrentActor())
                 .build();
@@ -573,7 +591,20 @@ public class InventoryServiceImpl implements InventoryService {
         for (OrderReturn rma : rmaList) {
             List<String> evidenceImages = new ArrayList<>();
             if (rma.getEvidenceImages() != null && !rma.getEvidenceImages().isBlank()) {
-                evidenceImages.add(rma.getEvidenceImages());
+                String rawImg = rma.getEvidenceImages().trim();
+                if (rawImg.startsWith("[") && rawImg.endsWith("]")) {
+                    String inner = rawImg.substring(1, rawImg.length() - 1).trim();
+                    if (!inner.isEmpty()) {
+                        for (String part : inner.split(",")) {
+                            String cleaned = part.trim().replaceAll("^\"|\"$", "");
+                            if (!cleaned.isEmpty()) {
+                                evidenceImages.add(cleaned);
+                            }
+                        }
+                    }
+                } else {
+                    evidenceImages.add(rawImg);
+                }
             }
 
             int reqQty = rma.getItems().stream()
@@ -587,14 +618,29 @@ public class InventoryServiceImpl implements InventoryService {
                     .mapToInt(OrderReturnItem::getApprovedQuantity)
                     .sum();
 
-            totalRmaDefects += reqQty;
+            String reasonCodeName = rma.getReasonCode() != null ? rma.getReasonCode().name() : "OTHER";
+            boolean isNotRejected = rma.getStatus() == null || !"REJECTED".equalsIgnoreCase(rma.getStatus().name());
+            boolean isQualityDefect = !"WRONG_SIZE".equals(reasonCodeName) && !"CHANGE_OF_MIND".equals(reasonCodeName);
+            if (isNotRejected && isQualityDefect) {
+                totalRmaDefects += (appQty > 0 ? appQty : reqQty);
+            }
+
+            String reasonLabel = switch (reasonCodeName) {
+                case "DEFECTIVE_PRODUCT" -> "Lỗi sản xuất / Gia công";
+                case "WRONG_ITEM" -> "Sai mẫu / Sai thông số lô";
+                case "NOT_AS_DESCRIBED" -> "Không đúng tiêu chuẩn mô tả";
+                case "SHIPPING_DAMAGE" -> "Hư hỏng bao bì / vận chuyển";
+                case "WRONG_SIZE" -> "Khách đổi kích cỡ";
+                case "CHANGE_OF_MIND" -> "Khách đổi nhu cầu";
+                default -> "Lý do khác";
+            };
 
             rmaItems.add(BatchTraceabilityResponse.TraceabilityRmaItem.builder()
                     .rmaId(rma.getId())
                     .orderId(rma.getOrder() != null ? rma.getOrder().getId() : null)
                     .customerEmail(rma.getUser() != null ? rma.getUser().getEmail() : null)
-                    .reasonCode(rma.getReasonCode() != null ? rma.getReasonCode().name() : null)
-                    .reasonLabel(rma.getReasonCode() != null ? rma.getReasonCode().name() : "Lỗi kỹ thuật")
+                    .reasonCode(reasonCodeName)
+                    .reasonLabel(reasonLabel)
                     .customerNote(rma.getReason())
                     .requestedQuantity(reqQty)
                     .approvedQuantity(appQty)
@@ -647,7 +693,9 @@ public class InventoryServiceImpl implements InventoryService {
 
         BatchTraceabilityResponse trace = traceBatch(batch.getBatchCode());
         int defectCustomerCount = trace.getTotalRmaDefects();
-        int quarantinedCount = batch.getQuantityRemaining() != null ? batch.getQuantityRemaining() : 0;
+        int quarantinedCount = Boolean.TRUE.equals(batch.getIsQuarantined()) && batch.getQuantityRemaining() != null
+                ? batch.getQuantityRemaining()
+                : 0;
         int totalClaimQty = defectCustomerCount + quarantinedCount;
         BigDecimal unitCost = batch.getUnitCost() != null ? batch.getUnitCost() : BigDecimal.ZERO;
         BigDecimal totalClaimAmount = unitCost.multiply(BigDecimal.valueOf(totalClaimQty));
