@@ -22,4 +22,9 @@ public class UserResponse {
     private Boolean isActive;
     private Boolean hasPassword;
     private java.time.Instant createdAt;
+    private Integer orderCount;
+    private java.math.BigDecimal totalSpent;
+    private String customerTier; // VIP, LOYAL, REGULAR
+    private String location;
+    private java.time.Instant lastOrderDate;
 }

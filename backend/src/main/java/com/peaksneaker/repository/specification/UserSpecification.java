@@ -28,11 +28,19 @@ public class UserSpecification {
             }
 
             if (role != null) {
-                predicates.add(cb.equal(root.get("role"), role));
+                if (role == Role.USER || role == Role.ROLE_CUSTOMER) {
+                    predicates.add(root.get("role").in(Role.USER, Role.ROLE_CUSTOMER));
+                } else {
+                    predicates.add(root.get("role").in(Role.ADMIN, Role.ROLE_ADMIN));
+                }
             }
 
-            if (startDate != null && endDate != null) {
-                predicates.add(cb.between(root.get("createdAt"), startDate, endDate));
+            if (startDate != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), startDate));
+            }
+
+            if (endDate != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), endDate));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
