@@ -1,5 +1,9 @@
 package com.peaksneaker.enums;
 
 public enum PaymentStatus {
-    PENDING ,PAID , FAILED, REFUNDED
+    UNPAID,
+    PENDING,
+    PAID,
+    FAILED,
+    REFUNDED
 }

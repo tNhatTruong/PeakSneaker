@@ -1,6 +1,7 @@
 package com.peaksneaker.controller;
 
 import com.peaksneaker.dto.response.ApiResponse;
+import com.peaksneaker.dto.response.VnpayIpnResponse;
 import com.peaksneaker.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -29,5 +30,11 @@ public class PaymentController {
                     .message("Thanh toán thất bại hoặc chữ ký không hợp lệ!")
                     .build());
         }
+    }
+
+    @GetMapping("/vnpay-ipn")
+    public ResponseEntity<VnpayIpnResponse> vnpayIpn(@RequestParam Map<String, String> queryParams) {
+        VnpayIpnResponse response = paymentService.processVnpayIpn(queryParams);
+        return ResponseEntity.ok(response);
     }
 }

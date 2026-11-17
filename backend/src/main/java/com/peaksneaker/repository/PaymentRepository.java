@@ -2,6 +2,7 @@ package com.peaksneaker.repository;
 
 import com.peaksneaker.entity.Order;
 import com.peaksneaker.entity.Payment;
+import com.peaksneaker.enums.PaymentStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,7 +20,11 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     Optional<Payment> findByTransactionId(String transactionId);
 
+    Optional<Payment> findFirstByOrderOrderByCreatedAtDesc(Order order);
+
     Page<Payment> findByStatus(String status, Pageable pageable);
 
     List<Payment> findByCreatedAtBetween(Instant start, Instant end);
+
+    long countByStatusAndCreatedAtBetween(PaymentStatus status, Instant start, Instant end);
 }

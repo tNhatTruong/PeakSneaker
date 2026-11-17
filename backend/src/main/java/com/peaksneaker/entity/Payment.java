@@ -4,6 +4,8 @@ import com.peaksneaker.enums.PaymentMethod;
 import com.peaksneaker.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.Instant;
 
@@ -24,20 +26,24 @@ public class Payment {
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", nullable = false, length = 50)
+    private PaymentMethod paymentMethod;
+
+    @Column(name = "transaction_id", unique = true)
+    private String transactionId;
+
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method", nullable = false, columnDefinition = "varchar(50)")
-    private PaymentMethod paymentMethod; // COD | VNPAY
-
-    @Column(name = "transaction_id")
-    private String transactionId;
+    @Column(name = "provider_response", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private String providerResponse;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false,columnDefinition = "varchar(50)")
+    @Column(nullable = false, length = 50)
     @Builder.Default
-    private PaymentStatus status = PaymentStatus.PENDING; // PENDING | SUCCESS | FAILED | REFUNDED
+    private PaymentStatus status = PaymentStatus.PENDING;
 
     @Column(name = "paid_at")
     private Instant paidAt;
@@ -46,34 +52,33 @@ public class Payment {
     @Builder.Default
     private Instant createdAt = Instant.now();
 
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
+    }
 
-    // Xác nhận thanh toán thành công
     public void markSuccess(String transactionId) {
         this.transactionId = transactionId;
         this.status = PaymentStatus.PAID;
         this.paidAt = Instant.now();
-
         if (this.order != null) {
-            this.order.updatePaymentStatus(PaymentStatus.PAID);
+            this.order.setPaymentStatus(PaymentStatus.PAID);
         }
     }
 
-    // Đánh dấu giao dịch thất bại
     public void markFailed() {
         this.status = PaymentStatus.FAILED;
-
         if (this.order != null) {
-            this.order.updatePaymentStatus(PaymentStatus.FAILED);
+            this.order.setPaymentStatus(PaymentStatus.FAILED);
         }
     }
 
-    // Thực hiện hoàn tiền
     public void markRefunded() {
         this.status = PaymentStatus.REFUNDED;
-
         if (this.order != null) {
-            this.order.updatePaymentStatus(PaymentStatus.REFUNDED);
+            this.order.setPaymentStatus(PaymentStatus.REFUNDED);
         }
     }
 }
-
