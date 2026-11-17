@@ -15,4 +15,5 @@ public class RevenueChartResponse {
     private String name;
     private String date;
     private BigDecimal revenue;
+    private Long orderCount;
 }

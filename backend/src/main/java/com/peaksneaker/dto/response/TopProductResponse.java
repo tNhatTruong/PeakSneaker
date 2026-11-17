@@ -17,4 +17,5 @@ public class TopProductResponse {
     private String imageUrl;
     private Long quantitySold;
     private BigDecimal price;
+    private BigDecimal grossSales;
 }
