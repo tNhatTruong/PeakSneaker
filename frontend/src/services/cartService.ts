@@ -5,12 +5,15 @@ export interface CartItemResponse {
   productId: number;
   productName: string;
   variantId: number;
+  sku?: string;
   color: string;
   size: string;
   quantity: number;
   price: number;
-  totalPrice: number;
+  totalPrice?: number;
+  subtotal?: number;
   productThumbnail: string;
+  stockQuantity?: number;
 }
 
 export interface CartResponse {

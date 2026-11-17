@@ -92,7 +92,7 @@ export default function CartPage() {
                   </Link>
                   <div className="flex min-w-0 flex-col justify-between gap-4">
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">SKU #{item.variantId}</p>
+                      <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">SKU: {item.sku || `#${item.variantId}`}</p>
                       <Link to={`/products/${item.productId}`} className="mt-1 block text-lg font-black leading-tight hover:underline">{item.productName}</Link>
                       <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-zinc-600">
                         <span className="border border-zinc-200 px-3 py-1.5">Màu: {item.color}</span><span className="border border-zinc-200 px-3 py-1.5">Size: {item.size}</span>
@@ -107,7 +107,7 @@ export default function CartPage() {
                       <button type="button" onClick={() => removeItem(item.id)} disabled={updatingId === item.id} className="inline-flex h-10 items-center gap-2 px-3 text-xs font-bold text-zinc-500 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /> Xóa</button>
                     </div>
                   </div>
-                  <div className="text-left sm:col-start-2 md:col-auto md:text-right"><p className="text-lg font-black">{formatPrice(item.totalPrice || item.price * item.quantity)}</p><p className="mt-1 text-xs text-zinc-400">{formatPrice(item.price)} / sản phẩm</p></div>
+                  <div className="text-left sm:col-start-2 md:col-auto md:text-right"><p className="text-lg font-black">{formatPrice(item.subtotal || item.totalPrice || item.price * item.quantity)}</p><p className="mt-1 text-xs text-zinc-400">{formatPrice(item.price)} / sản phẩm</p></div>
                 </article>
               ))}
             </section>
