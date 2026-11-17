@@ -36,6 +36,15 @@ public interface ProductService {
             BigDecimal minPrice, BigDecimal maxPrice,
             String search, int page, int size, String sortBy, String sortDirection);
 
+    PaginatedResponse<ProductResponse> filterProducts(
+            Long categoryId, Long brandId, Long silhouetteId,
+            Gender gender,
+            Boolean onSale,
+            Boolean inStockOnly,
+            String variantSize,
+            BigDecimal minPrice, BigDecimal maxPrice,
+            String search, int page, int size, String sortBy, String sortDirection);
+
     List<String> getAvailableSizes(Long categoryId, Long brandId, Long silhouetteId);
 
     List<AdminProductFilterOptionResponse> getFilterOptions();

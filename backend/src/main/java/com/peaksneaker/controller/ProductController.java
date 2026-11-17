@@ -72,6 +72,7 @@ public class ProductController {
             @RequestParam(required = false) Long silhouetteId,
             @RequestParam(required = false) Gender gender,
             @RequestParam(required = false) Boolean onSale,
+            @RequestParam(required = false) Boolean inStockOnly,
             @RequestParam(required = false) String variantSize,
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
@@ -81,7 +82,7 @@ public class ProductController {
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDirection) {
         return ResponseEntity.ok(ApiResponse.success("OK",
-                productService.filterProducts(categoryId, brandId, silhouetteId, gender, onSale, variantSize, minPrice, maxPrice, search, page, size, sortBy, sortDirection)));
+                productService.filterProducts(categoryId, brandId, silhouetteId, gender, onSale, inStockOnly, variantSize, minPrice, maxPrice, search, page, size, sortBy, sortDirection)));
     }
 
     @GetMapping("/admin")

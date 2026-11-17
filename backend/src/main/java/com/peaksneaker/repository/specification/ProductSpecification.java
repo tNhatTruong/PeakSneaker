@@ -56,6 +56,21 @@ public class ProductSpecification {
             BigDecimal maxPrice,
             String search
     ) {
+        return filterProducts(categoryId, brandId, silhouetteId, gender, onSale, null, variantSize, minPrice, maxPrice, search);
+    }
+
+    public static Specification<Product> filterProducts(
+            Long categoryId,
+            Long brandId,
+            Long silhouetteId,
+            Gender gender,
+            Boolean onSale,
+            Boolean inStockOnly,
+            String variantSize,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            String search
+    ) {
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -66,8 +81,24 @@ public class ProductSpecification {
                 predicates.add(criteriaBuilder.greaterThan(root.get("discountPercent"), BigDecimal.ZERO));
             }
 
+            if (Boolean.TRUE.equals(inStockOnly)) {
+                var subquery = query.subquery(Long.class);
+                var variantRoot = subquery.from(ProductVariant.class);
+                subquery.select(criteriaBuilder.literal(1L));
+                subquery.where(
+                        criteriaBuilder.equal(variantRoot.get("product"), root),
+                        criteriaBuilder.greaterThan(variantRoot.get("stockQuantity"), 0)
+                );
+                predicates.add(criteriaBuilder.exists(subquery));
+            }
+
             if (categoryId != null) {
-                predicates.add(criteriaBuilder.equal(root.get("category").get("id"), categoryId));
+                Join<Product, Category> catJoin = root.join("category", JoinType.LEFT);
+                Join<Category, Category> parentJoin = catJoin.join("parent", JoinType.LEFT);
+                predicates.add(criteriaBuilder.or(
+                        criteriaBuilder.equal(catJoin.get("id"), categoryId),
+                        criteriaBuilder.equal(parentJoin.get("id"), categoryId)
+                ));
             }
 
             if (brandId != null) {
@@ -104,12 +135,20 @@ public class ProductSpecification {
                 predicates.add(criteriaBuilder.greaterThan(variants.get("stockQuantity"), 0));
             }
 
-            if (minPrice != null) {
-                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("basePrice"), minPrice));
-            }
+            if (minPrice != null || maxPrice != null) {
+                var discount = criteriaBuilder.coalesce(root.<BigDecimal>get("discountPercent"), BigDecimal.ZERO);
+                var discountMultiplier = criteriaBuilder.diff(criteriaBuilder.literal(BigDecimal.valueOf(100)), discount);
+                var scaledEffectivePrice = criteriaBuilder.prod(root.<BigDecimal>get("basePrice"), discountMultiplier);
 
-            if (maxPrice != null) {
-                predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("basePrice"), maxPrice));
+                if (minPrice != null) {
+                    var scaledMinPrice = criteriaBuilder.literal(minPrice.multiply(BigDecimal.valueOf(100)));
+                    predicates.add(criteriaBuilder.greaterThanOrEqualTo(scaledEffectivePrice, scaledMinPrice));
+                }
+
+                if (maxPrice != null) {
+                    var scaledMaxPrice = criteriaBuilder.literal(maxPrice.multiply(BigDecimal.valueOf(100)));
+                    predicates.add(criteriaBuilder.lessThanOrEqualTo(scaledEffectivePrice, scaledMaxPrice));
+                }
             }
 
             if (StringUtils.hasText(search)) {
@@ -122,13 +161,13 @@ public class ProductSpecification {
 
                 for (String token : tokens) {
                     if (token.isEmpty()) continue;
-                    String pattern = "%" + token + "%";
+                    String skuPattern = "%" + token + "%";
                     Predicate tokenPredicate = criteriaBuilder.or(
-                            criteriaBuilder.like(criteriaBuilder.lower(root.get("name")), pattern),
-                            criteriaBuilder.like(criteriaBuilder.lower(brandJoin.get("name")), pattern),
-                            criteriaBuilder.like(criteriaBuilder.lower(silhouetteJoin.get("name")), pattern),
-                            criteriaBuilder.like(criteriaBuilder.lower(categoryJoin.get("name")), pattern),
-                            criteriaBuilder.like(criteriaBuilder.lower(variantJoin.get("sku")), pattern)
+                            buildWordBoundaryMatch(criteriaBuilder, root.get("name"), token),
+                            buildWordBoundaryMatch(criteriaBuilder, brandJoin.get("name"), token),
+                            buildWordBoundaryMatch(criteriaBuilder, silhouetteJoin.get("name"), token),
+                            buildWordBoundaryMatch(criteriaBuilder, categoryJoin.get("name"), token),
+                            criteriaBuilder.like(criteriaBuilder.lower(variantJoin.get("sku")), skuPattern)
                     );
                     predicates.add(tokenPredicate);
                 }
@@ -136,6 +175,21 @@ public class ProductSpecification {
 
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
         };
+    }
+
+    private static Predicate buildWordBoundaryMatch(
+            jakarta.persistence.criteria.CriteriaBuilder cb,
+            jakarta.persistence.criteria.Expression<String> field,
+            String token
+    ) {
+        var lowerField = cb.lower(field);
+        return cb.or(
+                cb.like(lowerField, token + "%"),
+                cb.like(lowerField, "% " + token + "%"),
+                cb.like(lowerField, "%-" + token + "%"),
+                cb.like(lowerField, "%(" + token + "%"),
+                cb.like(lowerField, "%/" + token + "%")
+        );
     }
 
     /**

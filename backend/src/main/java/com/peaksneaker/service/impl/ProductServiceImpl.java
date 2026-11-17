@@ -82,11 +82,24 @@ public class ProductServiceImpl implements ProductService {
             String variantSize,
             BigDecimal minPrice, BigDecimal maxPrice,
             String search, int page, int size, String sortBy, String sortDirection) {
+        return filterProducts(categoryId, brandId, silhouetteId, gender, onSale, null, variantSize, minPrice, maxPrice, search, page, size, sortBy, sortDirection);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<ProductResponse> filterProducts(
+            Long categoryId, Long brandId, Long silhouetteId,
+            Gender gender,
+            Boolean onSale,
+            Boolean inStockOnly,
+            String variantSize,
+            BigDecimal minPrice, BigDecimal maxPrice,
+            String search, int page, int size, String sortBy, String sortDirection) {
 
         Sort sort = buildSort(sortBy, sortDirection);
         Pageable pageable = PageRequest.of(page, size, sort);
         Specification<Product> spec = ProductSpecification.filterProducts(
-                categoryId, brandId, silhouetteId, gender, onSale, variantSize, minPrice, maxPrice, search);
+                categoryId, brandId, silhouetteId, gender, onSale, inStockOnly, variantSize, minPrice, maxPrice, search);
         return PaginatedResponse.from(productRepository.findAll(spec, pageable).map(this::mapToResponse));
     }
 
@@ -132,8 +145,16 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public List<ProductResponse> getFeaturedProducts(int limit) {
-        return productRepository.findByIsFeaturedTrueAndIsDeletedFalse(PageRequest.of(0, limit))
-                .getContent().stream().map(this::mapToResponse).collect(Collectors.toList());
+        int fetchSize = Math.max(limit * 2, 16);
+        Sort sort = Sort.by(Sort.Order.desc("totalSold"), Sort.Order.asc("id"));
+        return productRepository.findByIsFeaturedTrueAndIsDeletedFalse(PageRequest.of(0, fetchSize, sort))
+                .getContent().stream()
+                .map(this::mapToResponse)
+                .sorted(java.util.Comparator
+                        .<ProductResponse, Boolean>comparing(p -> (p.getTotalStock() != null ? p.getTotalStock() : 0) <= 0)
+                        .thenComparing(p -> p.getTotalSold() != null ? p.getTotalSold() : 0, java.util.Comparator.reverseOrder()))
+                .limit(limit)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -417,6 +438,9 @@ public class ProductServiceImpl implements ProductService {
             return dir == Sort.Direction.DESC
                     ? Sort.by(Sort.Order.desc("totalSold"), Sort.Order.desc("isFeatured"), Sort.Order.asc("id"))
                     : Sort.by(Sort.Order.asc("totalSold"), Sort.Order.asc("isFeatured"), Sort.Order.asc("id"));
+        }
+        if ("price".equalsIgnoreCase(sortBy)) {
+            return Sort.by(dir, "basePrice");
         }
         return Sort.by(dir, sortBy);
     }
