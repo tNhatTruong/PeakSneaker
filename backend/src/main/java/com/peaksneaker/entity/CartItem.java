@@ -2,10 +2,12 @@ package com.peaksneaker.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.math.BigDecimal;
+import java.time.Instant;
 
 @Entity
 @Table(name = "cart_items", uniqueConstraints = {
-        @UniqueConstraint(columnNames = { "cart_id", "product_variant_id" })
+    @UniqueConstraint(name = "uk_cart_item_cart_variant", columnNames = { "cart_id", "product_variant_id" })
 })
 @Getter
 @Setter
@@ -30,17 +32,25 @@ public class CartItem {
     @Builder.Default
     private Integer quantity = 1;
 
+    @Column(name = "created_at", nullable = false, updatable = false)
+    @Builder.Default
+    private Instant createdAt = Instant.now();
 
-    // Tính tổng tiền của dòng sản phẩm này trong giỏ: giá biến thể * số lượng
-    public java.math.BigDecimal getSubtotal() {
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
+    }
+
+    public BigDecimal getSubtotal() {
         if (this.productVariant == null) {
-            return java.math.BigDecimal.ZERO;
+            return BigDecimal.ZERO;
         }
-        java.math.BigDecimal finalPrice = this.productVariant.getFinalPrice();
+        BigDecimal finalPrice = this.productVariant.getFinalPrice();
         if (finalPrice == null) {
-            return java.math.BigDecimal.ZERO;
+            return BigDecimal.ZERO;
         }
-        return finalPrice.multiply(java.math.BigDecimal.valueOf(this.quantity));
+        return finalPrice.multiply(BigDecimal.valueOf(this.quantity));
     }
 }
-
