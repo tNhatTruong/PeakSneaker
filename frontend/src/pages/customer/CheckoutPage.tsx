@@ -1,18 +1,22 @@
-import { useState, useEffect } from "react";
-import { CreditCard, Banknote, MapPin, Package, ShieldCheck, X } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { CreditCard, Banknote, MapPin, Package, ShieldCheck, X, Loader2 } from "lucide-react";
 import { useCart } from "../../context/CartContext";
+import { useAuth } from "../../context/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import { getProvinces, getDistricts, getWards, calculateFee } from "../../services/shippingService";
 import type { Province, District, Ward } from "../../services/shippingService";
 import { createAddress, getAddresses } from "../../services/addressService";
 import type { AddressResponse } from "../../services/addressService";
-import { checkout } from "../../services/orderService";
+import { checkout, type CheckoutRequest } from "../../services/orderService";
 import { VoucherService } from "../../services/voucherService";
+import PageBackButton from "../../components/common/PageBackButton";
 
 export default function CheckoutPage() {
+  const checkoutKeyRef = useRef(crypto.randomUUID());
   const [paymentMethod, setPaymentMethod] = useState("VNPAY");
   const { cart, loading, fetchCart } = useCart();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -51,6 +55,13 @@ export default function CheckoutPage() {
   const [isCheckingVoucher, setIsCheckingVoucher] = useState(false);
 
   useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      toast.error("Vui lòng đăng nhập để tiến hành thanh toán.");
+      navigate("/login", { state: { from: location } });
+    }
+  }, [authLoading, isAuthenticated, navigate, location]);
+
+  useEffect(() => {
     if (!isBuyNow && !loading && !isOrderSuccessful && (!cart || cart.items.length === 0)) {
       toast.error("Giỏ hàng của bạn đang trống.");
       navigate("/shop");
@@ -65,18 +76,20 @@ export default function CheckoutPage() {
       }
     }).catch(err => console.error(err));
 
-    // Load user addresses
-    getAddresses().then(res => {
-      if (res && res.data) {
-        setAddressBook(res.data);
-        // Tự động điền địa chỉ mặc định
-        const defaultAddr = res.data.find((a: AddressResponse) => a.isDefault);
-        if (defaultAddr) {
-          handleSelectAddress(defaultAddr);
+    // Load user addresses only if authenticated
+    if (isAuthenticated) {
+      getAddresses().then(res => {
+        if (res && res.data) {
+          setAddressBook(res.data);
+          // Tự động điền địa chỉ mặc định
+          const defaultAddr = res.data.find((a: AddressResponse) => a.isDefault);
+          if (defaultAddr) {
+            handleSelectAddress(defaultAddr);
+          }
         }
-      }
-    }).catch(console.error);
-  }, []);
+      }).catch(console.error);
+    }
+  }, [isAuthenticated]);
 
   const handleSelectAddress = async (addr: AddressResponse) => {
     setSelectedAddressId(addr.id);
@@ -167,14 +180,14 @@ export default function CheckoutPage() {
     setIsCheckingVoucher(true);
     try {
       const res = await VoucherService.checkVoucher({ code: voucherCode, subtotal });
-      if (res.data.isValid) {
+      if (res.isValid) {
         setAppliedVoucher(voucherCode);
-        setDiscountAmount(res.data.discountAmount);
-        toast.success(res.data.message);
+        setDiscountAmount(res.discountAmount);
+        toast.success(res.message);
       } else {
         setAppliedVoucher(null);
         setDiscountAmount(0);
-        toast.error(res.data.message);
+        toast.error(res.message);
       }
     } catch (err: any) {
       setAppliedVoucher(null);
@@ -232,11 +245,12 @@ export default function CheckoutPage() {
       }
 
       // 2. Checkout
-      const checkoutReq: any = {
+      const checkoutReq: CheckoutRequest = {
+        idempotencyKey: checkoutKeyRef.current,
         addressId,
         paymentMethod,
         note,
-        voucherCode: appliedVoucher
+        voucherCode: appliedVoucher ?? undefined
       };
       
       if (isBuyNow) {
@@ -265,9 +279,18 @@ export default function CheckoutPage() {
     }
   };
 
+  if (authLoading || (!isAuthenticated && !isOrderSuccessful)) {
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <Loader2 className="w-10 h-10 animate-spin text-zinc-400" />
+      </div>
+    );
+  }
+
   return (
     <div className="bg-zinc-50 min-h-screen py-10">
       <div className="container mx-auto px-4 md:px-8 max-w-6xl">
+        <PageBackButton fallbackTo={isBuyNow ? "/shop" : "/cart"} label={isBuyNow ? "Quay lại sản phẩm" : "Quay lại giỏ hàng"} className="mb-5" />
         <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tighter text-zinc-900 mb-8">
           Thanh Toán
         </h1>

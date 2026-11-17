@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
-import axios from "axios";
-import { CheckCircle2, XCircle, Loader2, ArrowRight, ShoppingBag, Receipt } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, ShoppingBag, Receipt } from "lucide-react";
 
 import { useCart } from "../../context/CartContext";
+import apiClient from "../../services/api";
 
 export const VnpayReturnPage: React.FC = () => {
   const location = useLocation();
@@ -33,14 +33,9 @@ export const VnpayReturnPage: React.FC = () => {
 
     const verifyPayment = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const API_URL = "http://localhost:8080/api/v1/payment/vnpay-return";
-        
-        const response = await axios.get(`${API_URL}${location.search}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        });
+        const response = await apiClient.get<{ status: string }>(`/payment/vnpay-return${location.search}`);
 
-        if (response.data.status === "success") {
+        if (response.status === "success") {
           setStatus("success");
           setMessage("Thanh toán thành công! Cảm ơn bạn đã mua sắm tại PeakSneaker.");
           fetchCart(); // Cập nhật lại giỏ hàng
