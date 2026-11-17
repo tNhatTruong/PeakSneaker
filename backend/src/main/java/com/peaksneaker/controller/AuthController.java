@@ -71,4 +71,28 @@ public class AuthController {
         authService.changePassword(userDetails.getId(), request);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật mật khẩu thành công!", null));
     }
+
+    @PostMapping("/verify-otp")
+    public ResponseEntity<ApiResponse<Void>> verifyOtp(@Valid @RequestBody com.peaksneaker.dto.request.VerifyOtpRequest request) {
+        authService.verifyOtp(request);
+        return ResponseEntity.ok(ApiResponse.success("Xác thực tài khoản thành công! Bạn có thể đăng nhập ngay bây giờ.", null));
+    }
+
+    @PostMapping("/resend-otp")
+    public ResponseEntity<ApiResponse<Void>> resendOtp(@RequestParam String email) {
+        authService.resendOtp(email);
+        return ResponseEntity.ok(ApiResponse.success("Mã OTP mới đã được gửi vào email của bạn.", null));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody com.peaksneaker.dto.request.ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+        return ResponseEntity.ok(ApiResponse.success("Mã khôi phục mật khẩu đã được gửi đến email của bạn.", null));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody com.peaksneaker.dto.request.ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok(ApiResponse.success("Đặt lại mật khẩu thành công! Vui lòng đăng nhập với mật khẩu mới.", null));
+    }
 }
