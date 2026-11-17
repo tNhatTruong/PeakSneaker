@@ -1,45 +1,26 @@
-version: '3.9'
-
 services:
-  # Cấu hình cho MySQL 
-  # Khởi chạy: docker-compose up mysql -d
-  mysql:
-    image: mysql:8.4
-    container_name: peaksneaker_mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: 1
-      MYSQL_DATABASE: peaksneaker
-    ports:
-      - "3306:3306"
-    volumes:
-      # Mount volume để lưu trữ data không bị mất khi xóa container
-      - peaksneaker_mysql_data:/var/lib/mysql
-      # Mount file SQL vào thư mục khởi tạo tự động của MySQL
-      # Khi container chạy lần ĐẦU TIÊN (volume trống), MySQL sẽ tự động chạy script này
-      - ../backend/src/main/resources/sql/peaksneaker_web_mysql.sql:/docker-entrypoint-initdb.d/1-init.sql
-    profiles:
-      - default
-      - mysql
-
-  # Cấu hình cho PostgreSQL
-  # Khởi chạy: docker-compose up postgres -d
+  # Cấu hình CSDL PostgreSQL 16 Độc lập cho PeakSneaker Dev Sandbox
+  # Khởi chạy: docker compose -f infra/docker-compose.yml up -d
   postgres:
-    image: postgres:16
-    container_name: peaksneaker_postgres
+    image: postgres:16-alpine
+    container_name: peaksneaker_dev_db
     environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: 1
-      POSTGRES_DB: peaksneaker
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: peaksneaker_db
+      PGDATA: /var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "5434:5432"
     volumes:
-      # Mount volume để lưu trữ data
-      - peaksneaker_postgres_data:/var/lib/postgresql/data
-      # Mount file SQL vào thư mục khởi tạo tự động của PostgreSQL
-      - ../backend/src/main/resources/sql/peaksneaker_db_postgres.sql:/docker-entrypoint-initdb.d/1-init.sql
-    profiles:
-      - postgres
+      # Volume lưu trữ dữ liệu độc lập
+      - peaksneaker_standalone_postgres_data:/var/lib/postgresql/data
+      # Mount script DDL 24 bảng khởi tạo tự động
+      - ./peaksneaker.sql:/docker-entrypoint-initdb.d/1-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d peaksneaker_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
-  peaksneaker_mysql_data:
-  peaksneaker_postgres_data:
+  peaksneaker_standalone_postgres_data:
