@@ -5,11 +5,13 @@ import com.peaksneaker.dto.response.LoginResponse;
 import com.peaksneaker.dto.response.UserResponse;
 import com.peaksneaker.entity.Cart;
 import com.peaksneaker.entity.User;
+import com.peaksneaker.entity.UserPermission;
 import com.peaksneaker.enums.Role;
 import com.peaksneaker.exception.BadRequestException;
 import com.peaksneaker.exception.ConflictException;
 import com.peaksneaker.exception.ResourceNotFoundException;
 import com.peaksneaker.repository.CartRepository;
+import com.peaksneaker.repository.UserPermissionRepository;
 import com.peaksneaker.repository.UserRepository;
 import com.peaksneaker.security.JwtUtils;
 import com.peaksneaker.security.UserDetailsImpl;
@@ -25,6 +27,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -35,6 +38,7 @@ import org.springframework.web.client.RestTemplate;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -46,6 +50,7 @@ public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
     private final CartRepository cartRepository;
+    private final UserPermissionRepository userPermissionRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtUtils jwtUtils;
@@ -55,8 +60,38 @@ public class AuthServiceImpl implements AuthService {
     private static final Map<String, TokenEntry> OTP_CACHE = new ConcurrentHashMap<>();
     private static final Map<String, TokenEntry> RESET_PASSWORD_CACHE = new ConcurrentHashMap<>();
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final int MAX_CACHE_ENTRIES = 10_000;
 
     private record TokenEntry(String code, Instant expiresAt, int attempts) {}
+
+    private static void evictExpiredTokens(Map<String, TokenEntry> cache) {
+        Instant now = Instant.now();
+        cache.entrySet().removeIf(entry -> entry.getValue().expiresAt().isBefore(now));
+        if (cache.size() >= MAX_CACHE_ENTRIES) {
+            cache.clear();
+        }
+    }
+
+    private List<String> resolveEffectivePermissions(User user) {
+        List<String> granted = new ArrayList<>();
+        List<String> revoked = new ArrayList<>();
+        if (userPermissionRepository != null && user.getId() != null) {
+            for (UserPermission up : userPermissionRepository.findByUserId(user.getId())) {
+                if (up.getPermission() == null || up.getPermission().getCode() == null) continue;
+                if (Boolean.TRUE.equals(up.getIsGranted())) {
+                    granted.add(up.getPermission().getCode());
+                } else {
+                    revoked.add(up.getPermission().getCode());
+                }
+            }
+        }
+        UserDetailsImpl details = UserDetailsImpl.build(user, granted, revoked);
+        return details.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(auth -> !auth.startsWith("ROLE_"))
+                .sorted()
+                .toList();
+    }
 
     @Override
     @Transactional
@@ -93,6 +128,7 @@ public class AuthServiceImpl implements AuthService {
         cartRepository.save(cart);
 
         // Tạo mã OTP 6 chữ số
+        evictExpiredTokens(OTP_CACHE);
         String otpCode = String.format("%06d", RANDOM.nextInt(1000000));
         OTP_CACHE.put(savedUser.getEmail(), new TokenEntry(otpCode, Instant.now().plusSeconds(300), 0));
 
@@ -139,6 +175,7 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(cleanEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Người dùng", "email", cleanEmail));
 
+        evictExpiredTokens(OTP_CACHE);
         String otpCode = String.format("%06d", RANDOM.nextInt(1000000));
         OTP_CACHE.put(cleanEmail, new TokenEntry(otpCode, Instant.now().plusSeconds(300), 0));
 
@@ -151,12 +188,16 @@ public class AuthServiceImpl implements AuthService {
                 new UsernamePasswordAuthenticationToken(request.getEmail().trim().toLowerCase(), request.getPassword())
         );
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        String jwt = jwtUtils.generateJwtToken(authentication);
-
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         User user = userRepository.findById(userDetails.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Người dùng", "id", userDetails.getId()));
+
+        if (Boolean.FALSE.equals(user.getIsVerified())) {
+            throw new BadRequestException("Tài khoản chưa được xác thực mã OTP. Vui lòng kiểm tra email để kích hoạt tài khoản.");
+        }
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        String jwt = jwtUtils.generateJwtToken(authentication);
 
         return LoginResponse.builder()
                 .token(jwt)
@@ -164,6 +205,7 @@ public class AuthServiceImpl implements AuthService {
                 .fullName(user.getFullname())
                 .role(user.getRole())
                 .hasPassword(user.getHasPassword())
+                .permissions(resolveEffectivePermissions(user))
                 .build();
     }
 
@@ -180,6 +222,7 @@ public class AuthServiceImpl implements AuthService {
                 .phone(user.getPhone())
                 .role(user.getRole())
                 .hasPassword(user.getHasPassword())
+                .permissions(resolveEffectivePermissions(user))
                 .build();
     }
 
@@ -216,7 +259,7 @@ public class AuthServiceImpl implements AuthService {
                         .passwordHash(passwordEncoder.encode(UUID.randomUUID().toString()))
                         .firstName(firstName != null ? firstName : "User")
                         .lastName(lastName != null ? lastName : "")
-                        .phone("")
+                        .phone(null)
                         .role(Role.USER)
                         .isActive(true)
                         .isVerified(true)
@@ -229,6 +272,14 @@ public class AuthServiceImpl implements AuthService {
                         .items(new ArrayList<>())
                         .build();
                 cartRepository.save(cart);
+            } else {
+                if (Boolean.FALSE.equals(user.getIsActive())) {
+                    throw new BadRequestException("Tài khoản đã bị tạm khóa hoặc ngừng hoạt động.");
+                }
+                if (Boolean.FALSE.equals(user.getIsVerified())) {
+                    user.setIsVerified(true);
+                    user = userRepository.save(user);
+                }
             }
 
             UserDetails userDetails = UserDetailsImpl.build(user);
@@ -242,6 +293,7 @@ public class AuthServiceImpl implements AuthService {
                 .fullName(user.getFullname())
                 .role(user.getRole())
                 .hasPassword(user.getHasPassword())
+                .permissions(resolveEffectivePermissions(user))
                 .build();
 
         } catch (Exception e) {
@@ -265,6 +317,7 @@ public class AuthServiceImpl implements AuthService {
                 .phone(user.getPhone())
                 .role(user.getRole())
                 .hasPassword(user.getHasPassword())
+                .permissions(resolveEffectivePermissions(user))
                 .build();
     }
 
@@ -301,6 +354,7 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Người dùng", "email", email));
 
+        evictExpiredTokens(RESET_PASSWORD_CACHE);
         String resetToken = String.format("%06d", RANDOM.nextInt(1000000));
         RESET_PASSWORD_CACHE.put(email, new TokenEntry(resetToken, Instant.now().plusSeconds(600), 0));
 
