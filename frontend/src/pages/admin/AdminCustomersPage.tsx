@@ -553,6 +553,9 @@ export default function AdminCustomersPage() {
                       )}
                     </div>
                     <p className="text-xs text-slate-500 truncate">{customerDetail.email}</p>
+                    <p className="text-[11px] text-slate-600 font-medium truncate mt-0.5">
+                      SĐT: {customerDetail.phone || "Chưa cập nhật"}
+                    </p>
                     <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
                       <MapPin className="w-3 h-3 text-slate-400" />
                       {customerDetail.location}

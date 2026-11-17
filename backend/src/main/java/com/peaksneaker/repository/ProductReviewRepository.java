@@ -21,5 +21,8 @@ public interface ProductReviewRepository extends JpaRepository<ProductReview, Lo
     @Query("SELECT AVG(r.rating) FROM ProductReview r WHERE r.product.id = :productId AND r.status = 'APPROVED'")
     Double getAverageRatingByProductId(@Param("productId") Long productId);
 
+    @Query("SELECT AVG(r.rating) FROM ProductReview r WHERE r.user.id = :userId")
+    Double getAverageRatingByUserId(@Param("userId") Long userId);
+
     long countByProductIdAndStatus(Long productId, String status);
 }

@@ -166,7 +166,7 @@ public class DashboardServiceImpl implements DashboardService {
             long orderCount = orderRepository.countByCreatedAtBetween(
                     startOfDay(bucketStart), endOfDay(bucketEnd));
             chartData.add(RevenueChartResponse.builder()
-                    .name(formatBucketLabel(bucketStart, bucketDays))
+                    .name(formatBucketLabel(bucketStart, bucketDays, totalDays))
                     .date(bucketStart.toString())
                     .revenue(revenue)
                     .orderCount(orderCount)
@@ -354,9 +354,12 @@ public class DashboardServiceImpl implements DashboardService {
         return Math.round(value * 10.0) / 10.0;
     }
 
-    private String formatBucketLabel(LocalDate date, int bucketDays) {
+    private String formatBucketLabel(LocalDate date, int bucketDays, long totalDays) {
         if (bucketDays == 1) {
-            return getVietnameseDayOfWeek(date);
+            if (totalDays <= 7) {
+                return getVietnameseDayOfWeek(date) + " (" + date.format(DateTimeFormatter.ofPattern("dd/MM")) + ")";
+            }
+            return date.format(DateTimeFormatter.ofPattern("dd/MM"));
         }
         if (bucketDays == 7) {
             return date.format(DateTimeFormatter.ofPattern("dd/MM"));

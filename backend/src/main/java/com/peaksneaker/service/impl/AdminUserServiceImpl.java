@@ -11,6 +11,7 @@ import com.peaksneaker.exception.BadRequestException;
 import com.peaksneaker.exception.ResourceNotFoundException;
 import com.peaksneaker.repository.AddressRepository;
 import com.peaksneaker.repository.OrderRepository;
+import com.peaksneaker.repository.ProductReviewRepository;
 import com.peaksneaker.repository.UserRepository;
 import com.peaksneaker.repository.WishlistRepository;
 import com.peaksneaker.repository.specification.UserSpecification;
@@ -38,6 +39,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     private final OrderRepository orderRepository;
     private final AddressRepository addressRepository;
     private final WishlistRepository wishlistRepository;
+    private final ProductReviewRepository productReviewRepository;
 
     @Override
     public PaginatedResponse<UserResponse> getUsers(
@@ -73,7 +75,14 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .findFirst()
                 .or(() -> addresses.stream().findFirst())
                 .map(Address::getProvinceName)
+                .or(() -> orders.stream()
+                        .map(Order::getShippingProvince)
+                        .filter(p -> p != null && !p.isBlank())
+                        .findFirst())
                 .orElse("Chưa cập nhật");
+
+        Double rawAvgRating = productReviewRepository.getAverageRatingByUserId(user.getId());
+        double averageRating = rawAvgRating != null ? Math.round(rawAvgRating * 10.0) / 10.0 : 0.0;
 
         List<AddressResponse> addressResponses = addresses.stream()
                 .map(AddressResponse::from)
@@ -106,7 +115,7 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .createdAt(user.getCreatedAt())
                 .orderCount(orderCount)
                 .totalSpent(totalSpent)
-                .averageRating(4.8)
+                .averageRating(averageRating)
                 .wishlistCount(wishlistCount)
                 .customerTier(tier)
                 .location(location)
@@ -178,6 +187,10 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .findFirst()
                 .or(() -> addresses.stream().findFirst())
                 .map(Address::getProvinceName)
+                .or(() -> orders.stream()
+                        .map(Order::getShippingProvince)
+                        .filter(p -> p != null && !p.isBlank())
+                        .findFirst())
                 .orElse(null);
 
         Instant lastOrderDate = orders.isEmpty() ? null : orders.get(0).getCreatedAt();
