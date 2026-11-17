@@ -5,6 +5,9 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
 @Data
 public class CreateTransactionRequest {
 
@@ -19,4 +22,14 @@ public class CreateTransactionRequest {
     private InventoryTransactionType type;
 
     private String note;
+
+    private String batchCode;
+
+    private String supplierName;
+
+    private BigDecimal unitCost;
+
+    private LocalDate manufacturingDate;
+
+    private LocalDate expiryDate;
 }
