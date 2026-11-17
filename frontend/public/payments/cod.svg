@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 44" width="120" height="44">
+  <rect width="120" height="44" rx="6" fill="#18181b" stroke="#3f3f46" stroke-width="1"/>
+  <!-- Cash banknote icon -->
+  <g transform="translate(14, 11)">
+    <rect x="0" y="2" width="26" height="18" rx="2.5" fill="#10b981" fill-opacity="0.15" stroke="#10b981" stroke-width="1.6"/>
+    <circle cx="13" cy="11" r="3.5" fill="#10b981"/>
+    <line x1="4" y1="6" x2="4" y2="8" stroke="#10b981" stroke-width="1.2" stroke-linecap="round"/>
+    <line x1="22" y1="14" x2="22" y2="16" stroke="#10b981" stroke-width="1.2" stroke-linecap="round"/>
+  </g>
+  <!-- COD Text -->
+  <text x="47" y="22" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="14" fill="#ffffff" letter-spacing="0.5">COD</text>
+  <text x="47" y="32" font-family="system-ui, -apple-system, sans-serif" font-weight="600" font-size="8" fill="#a1a1aa" letter-spacing="0.2">TIỀN MẶT</text>
+</svg>
