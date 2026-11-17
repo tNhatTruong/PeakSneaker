@@ -1,11 +1,17 @@
 package com.peaksneaker.dto.request;
 
 import com.peaksneaker.enums.PaymentMethod;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
 public class CheckoutRequest {
+
+    @NotBlank(message = "Mã chống tạo trùng đơn hàng không được để trống")
+    private String idempotencyKey;
     
     @NotNull(message = "Địa chỉ giao hàng không được để trống")
     private Long addressId;
@@ -21,5 +27,8 @@ public class CheckoutRequest {
     
     // Mua ngay (không qua giỏ hàng)
     private Long buyNowVariantId;
+
+    @Min(value = 1, message = "Số lượng mua ngay tối thiểu là 1")
+    @Max(value = 99, message = "Số lượng mua ngay tối đa là 99")
     private Integer buyNowQuantity;
 }

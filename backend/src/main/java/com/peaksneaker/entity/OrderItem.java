@@ -22,16 +22,16 @@ public class OrderItem {
     private Order order;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_variant_id",nullable = false)
+    @JoinColumn(name = "product_variant_id")
     private ProductVariant productVariant;
 
     @Column(name = "product_name", nullable = false)
     private String productName;
 
-    @Column(length = 100)
+    @Column(nullable = false, length = 100)
     private String sku;
 
-    @Column(name = "variant_name")
+    @Column(name = "variant_name", nullable = false)
     private String variantName;
 
     @Column(nullable = false)
@@ -43,10 +43,9 @@ public class OrderItem {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal subtotal;
 
-    @Column(name = "image_url")
+    @Transient
     private String imageUrl;
 
-    // Tính tổng giá tiền của dòng vật phẩm: giá đã chốt chặn * số lượng
     public void calculateSubtotal() {
         if (this.unitPrice == null) {
             this.unitPrice = BigDecimal.ZERO;
@@ -57,4 +56,3 @@ public class OrderItem {
         this.subtotal = this.unitPrice.multiply(BigDecimal.valueOf(this.quantity));
     }
 }
-

@@ -1,5 +1,11 @@
 package com.peaksneaker.enums;
 
 public enum OrderStatus {
-    PENDING ,SHIPPING , COMPLETED, CANCELLED
+    PENDING,
+    CONFIRMED,
+    PROCESSING,
+    SHIPPING,
+    DELIVERED,
+    COMPLETED,
+    CANCELLED
 }

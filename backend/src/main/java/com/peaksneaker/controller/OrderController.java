@@ -7,6 +7,7 @@ import com.peaksneaker.enums.PaymentMethod;
 import com.peaksneaker.security.UserDetailsImpl;
 import com.peaksneaker.service.OrderService;
 import com.peaksneaker.service.PaymentService;
+import com.peaksneaker.service.ShipmentService;
 import com.peaksneaker.dto.response.CheckoutResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class OrderController {
 
     private final OrderService orderService;
     private final PaymentService paymentService;
+    private final ShipmentService shipmentService;
 
     @PostMapping("/checkout")
     public ResponseEntity<ApiResponse<CheckoutResponse>> checkout(
@@ -68,5 +70,21 @@ public class OrderController {
         
         var order = orderService.getOrderById(userDetails.getId(), id);
         return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết đơn hàng thành công!", order));
+    }
+
+    @GetMapping("/{id}/shipment")
+    public ResponseEntity<ApiResponse<com.peaksneaker.dto.response.ShipmentResponse>> getShipment(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy hành trình vận chuyển thành công",
+                shipmentService.getForCustomer(userDetails.getId(), id)));
+    }
+
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<ApiResponse<com.peaksneaker.dto.response.OrderResponse>> cancelOrder(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @PathVariable Long id) {
+        var order = orderService.cancelOrder(userDetails.getId(), id);
+        return ResponseEntity.ok(ApiResponse.success("Hủy đơn hàng thành công và đã hoàn trả tồn kho.", order));
     }
 }

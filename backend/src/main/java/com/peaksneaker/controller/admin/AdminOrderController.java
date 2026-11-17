@@ -1,11 +1,15 @@
-package com.peaksneaker.controller;
+package com.peaksneaker.controller.admin;
 
+import com.peaksneaker.dto.request.AdminCreateOrderRequest;
 import com.peaksneaker.dto.request.OrderFilterDto;
 import com.peaksneaker.dto.response.ApiResponse;
 import com.peaksneaker.dto.response.OrderResponse;
 import com.peaksneaker.dto.response.PaginatedResponse;
+import com.peaksneaker.dto.response.ShipmentResponse;
 import com.peaksneaker.enums.OrderStatus;
 import com.peaksneaker.service.OrderService;
+import com.peaksneaker.service.ShipmentService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +20,14 @@ import org.springframework.web.bind.annotation.*;
 public class AdminOrderController {
 
     private final OrderService orderService;
+    private final ShipmentService shipmentService;
+
+    @PostMapping
+    public ResponseEntity<ApiResponse<OrderResponse>> createOrder(
+            @Valid @RequestBody AdminCreateOrderRequest request) {
+        OrderResponse created = orderService.createOrderAdmin(request);
+        return ResponseEntity.ok(ApiResponse.success("Tạo đơn hàng thành công", created));
+    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<PaginatedResponse<OrderResponse>>> getAllOrders(
@@ -40,5 +52,15 @@ public class AdminOrderController {
         
         OrderResponse updatedOrder = orderService.updateOrderStatusAdmin(id, status);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái đơn hàng thành công", updatedOrder));
+    }
+
+    @PostMapping("/{id}/shipment")
+    public ResponseEntity<ApiResponse<ShipmentResponse>> dispatchShipment(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Tạo vận đơn GHN thành công", shipmentService.dispatch(id)));
+    }
+
+    @GetMapping("/{id}/shipment")
+    public ResponseEntity<ApiResponse<ShipmentResponse>> getShipment(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy vận đơn thành công", shipmentService.getForAdmin(id)));
     }
 }
