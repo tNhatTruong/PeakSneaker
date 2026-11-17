@@ -104,3 +104,13 @@ $RECYCLE.BIN/
 backend/src/main/resources/application-ghn.properties
 backend/src/main/resources/application-google.properties
 backend/src/main/resources/application-vnpay.properties
+backend/src/main/resources/application-cloudinary.properties
+backend/src/main/resources/application-mail.properties
+skills-lock.json
+.codex/
+AGENTS.md
+docx/
+/*.doc
+/*.docx
+/*.pdf
+~$*
