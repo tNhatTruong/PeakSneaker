@@ -24,7 +24,6 @@ export interface CartResponse {
 export const CartService = {
   getCart: async () => {
     const response = await apiClient.get<ApiResponse<CartResponse>>('/cart');
-    // @ts-ignore
     return response.data as CartResponse;
   },
 
@@ -33,7 +32,6 @@ export const CartService = {
       variantId,
       quantity
     });
-    // @ts-ignore
     return response.data as CartItemResponse;
   },
 
@@ -41,7 +39,6 @@ export const CartService = {
     const response = await apiClient.put<ApiResponse<CartItemResponse>>(`/cart/items/${itemId}`, {
       quantity
     });
-    // @ts-ignore
     return response.data as CartItemResponse;
   },
 

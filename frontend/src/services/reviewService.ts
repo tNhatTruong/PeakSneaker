@@ -20,7 +20,6 @@ export interface ReviewResponse {
   rating: number;
   comment: string;
   createdAt: string;
-  isEdited: boolean;
 }
 
 export interface ReviewStatsResponse {
@@ -44,25 +43,21 @@ export const ReviewService = {
 
   getProductReviewStats: async (productId: number) => {
     const response = await apiClient.get<ApiResponse<ReviewStatsResponse>>(`/reviews/product/${productId}/stats`);
-    // @ts-ignore
     return response.data as ReviewStatsResponse;
   },
 
   addOrUpdateReview: async (data: ReviewRequest) => {
     const response = await apiClient.post<ApiResponse<ReviewResponse>>(`/reviews`, data);
-    // @ts-ignore
     return response.data as ReviewResponse;
   },
 
   getMyReview: async (productId: number) => {
     const response = await apiClient.get<ApiResponse<ReviewResponse>>(`/reviews/product/${productId}/me`);
-    // @ts-ignore
     return response.data as ReviewResponse;
   },
 
   checkCanReview: async (productId: number) => {
     const response = await apiClient.get<ApiResponse<boolean>>(`/reviews/product/${productId}/can-review`);
-    // @ts-ignore
     return response.data as boolean;
   }
 };

@@ -1,6 +1,4 @@
-import axios from "axios";
-
-const API_URL = "http://localhost:8080/api/v1/shipping";
+import apiClient, { type ApiResponse } from "./api";
 
 export interface Province {
   ProvinceID: number;
@@ -17,27 +15,26 @@ export interface Ward {
   WardName: string;
 }
 
-const getAuthHeaders = () => {
-  const token = localStorage.getItem("token");
-  return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-};
+export interface ShippingFee {
+  total: number;
+  serviceFee?: number;
+  insuranceFee?: number;
+}
 
 export const getProvinces = async () => {
-  const response = await axios.get(`${API_URL}/provinces`, getAuthHeaders());
-  return response.data;
+  return apiClient.get<ApiResponse<Province[]>>("/shipping/provinces");
 };
 
 export const getDistricts = async (provinceId: number) => {
-  const response = await axios.get(`${API_URL}/districts?provinceId=${provinceId}`, getAuthHeaders());
-  return response.data;
+  return apiClient.get<ApiResponse<District[]>>("/shipping/districts", { params: { provinceId } });
 };
 
 export const getWards = async (districtId: number) => {
-  const response = await axios.get(`${API_URL}/wards?districtId=${districtId}`, getAuthHeaders());
-  return response.data;
+  return apiClient.get<ApiResponse<Ward[]>>("/shipping/wards", { params: { districtId } });
 };
 
 export const calculateFee = async (districtId: number, wardCode: string) => {
-  const response = await axios.post(`${API_URL}/fee?toDistrictId=${districtId}&toWardCode=${wardCode}`, {}, getAuthHeaders());
-  return response.data;
+  return apiClient.post<ApiResponse<ShippingFee>>("/shipping/fee", {}, {
+    params: { toDistrictId: districtId, toWardCode: wardCode },
+  });
 };

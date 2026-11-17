@@ -1,17 +1,35 @@
-import axios from "axios";
-
-const API_URL = "http://localhost:8080/api/v1/orders";
-
-const getAuthHeaders = () => {
-  const token = localStorage.getItem("token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
+import apiClient, { type ApiResponse } from "./api";
 
 export interface CheckoutRequest {
+  idempotencyKey: string;
   addressId: number;
   paymentMethod: string;
   voucherCode?: string;
   note?: string;
+  buyNowVariantId?: number;
+  buyNowQuantity?: number;
+}
+
+export interface ShipmentEventResponse {
+  id: number;
+  eventType: string;
+  providerStatus: string;
+  occurredAt: string;
+  applied: boolean;
+}
+
+export interface ShipmentResponse {
+  id: number;
+  orderId: number;
+  provider: string;
+  providerOrderCode: string;
+  status: string;
+  providerStatus: string;
+  codAmount: number;
+  shippingFee: number;
+  expectedDeliveryAt: string | null;
+  lastEventAt: string | null;
+  events: ShipmentEventResponse[];
 }
 
 export interface OrderItemResponse {
@@ -29,6 +47,7 @@ export interface OrderItemResponse {
 
 export interface OrderResponse {
   id: number;
+  orderCode: string;
   userId: number;
   voucherCode: string | null;
   items: OrderItemResponse[];
@@ -36,8 +55,11 @@ export interface OrderResponse {
   discountAmount: number;
   shippingFee: number;
   finalAmount: number;
-  status: "PENDING" | "PROCESSING" | "DELIVERING" | "COMPLETED" | "CANCELLED";
-  paymentStatus: "PENDING" | "PAID" | "FAILED" | "REFUNDED";
+  status: "PENDING" | "CONFIRMED" | "PROCESSING" | "SHIPPING" | "DELIVERED" | "COMPLETED" | "CANCELLED";
+  paymentStatus: "UNPAID" | "PENDING" | "PAID" | "FAILED" | "REFUNDED";
+  paymentMethod: "COD" | "VNPAY";
+  ghnOrderCode: string | null;
+  ghnTrackingStatus: string | null;
   shippingName: string;
   shippingPhone: string;
   shippingProvince: string;
@@ -47,6 +69,9 @@ export interface OrderResponse {
   note: string;
   createdAt: string;
   updatedAt: string;
+  deliveredAt: string | null;
+  latestReturnId: number | null;
+  latestReturnStatus: "REQUESTED" | "APPROVED" | "REJECTED" | "GOODS_RECEIVED" | "COMPLETED" | null;
 }
 
 export interface PaginatedResponse<T> {
@@ -58,23 +83,33 @@ export interface PaginatedResponse<T> {
   last: boolean;
 }
 
+export interface CheckoutResponse {
+  orderId: number;
+  paymentUrl?: string;
+}
+
 export const checkout = async (request: CheckoutRequest) => {
-  const response = await axios.post(`${API_URL}/checkout`, request, {
-    headers: getAuthHeaders(),
+  return apiClient.post<ApiResponse<CheckoutResponse>, CheckoutRequest>("/orders/checkout", request);
+};
+
+export const getOrders = async (page = 0, size = 10): Promise<PaginatedResponse<OrderResponse>> => {
+  const response = await apiClient.get<ApiResponse<PaginatedResponse<OrderResponse>>>("/orders", {
+    params: { page, size },
   });
   return response.data;
 };
 
-export const getOrders = async (page = 0, size = 10): Promise<PaginatedResponse<OrderResponse>> => {
-  const response = await axios.get(`${API_URL}?page=${page}&size=${size}`, {
-    headers: getAuthHeaders(),
-  });
-  return response.data.data;
+export const getOrderById = async (id: number): Promise<OrderResponse> => {
+  const response = await apiClient.get<ApiResponse<OrderResponse>>(`/orders/${id}`);
+  return response.data;
 };
 
-export const getOrderById = async (id: number): Promise<OrderResponse> => {
-  const response = await axios.get(`${API_URL}/${id}`, {
-    headers: getAuthHeaders(),
-  });
-  return response.data.data;
+export const cancelOrder = async (id: number): Promise<OrderResponse> => {
+  const response = await apiClient.post<ApiResponse<OrderResponse>>(`/orders/${id}/cancel`);
+  return response.data;
+};
+
+export const getOrderShipment = async (id: number): Promise<ShipmentResponse> => {
+  const response = await apiClient.get<ApiResponse<ShipmentResponse>>(`/orders/${id}/shipment`);
+  return response.data;
 };

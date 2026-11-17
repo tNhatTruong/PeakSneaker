@@ -3,6 +3,7 @@ import apiClient, { type ApiResponse } from './api';
 export interface BrandResponse {
   id: number;
   name: string;
+  slug: string;
   logoUrl: string;
 }
 
@@ -18,6 +19,8 @@ export interface ProductResponse {
   price?: number;
   isDeleted?: boolean;
   totalStock?: number;
+  gender?: 'MEN' | 'WOMEN' | 'UNISEX' | 'KIDS';
+  totalSold?: number;
 }
 
 export interface ImageResponse {
@@ -33,6 +36,7 @@ export interface ProductVariantResponse {
   size: string;
   stock: number;
   priceMultiplier: number;
+  originalPrice?: number;
   finalPrice: number;
 }
 
@@ -41,9 +45,16 @@ export interface CategoryResponse {
   name: string;
 }
 
+export interface ProductFilterOptionResponse {
+  brandId: number | null;
+  categoryId: number | null;
+  silhouetteId: number | null;
+}
+
 export interface SilhouetteResponse {
   id: number;
   name: string;
+  slug: string;
 }
 
 export interface ProductDetailResponse {
@@ -62,6 +73,7 @@ export interface ProductDetailResponse {
   isFeatured: boolean;
   isNew: boolean;
   isDeleted?: boolean;
+  totalSold?: number;
   images: ImageResponse[];
   variants: ProductVariantResponse[];
 }
@@ -69,14 +81,12 @@ export interface ProductDetailResponse {
 export const ProductService = {
   getProductById: async (id: number) => {
     const response = await apiClient.get<ApiResponse<ProductDetailResponse>>(`/products/${id}`);
-    // @ts-ignore
     return response.data as ProductDetailResponse;
   },
   getFeaturedProducts: async (limit: number = 8) => {
     const response = await apiClient.get<ApiResponse<ProductResponse[]>>('/products/featured', {
       params: { limit },
     });
-    // @ts-ignore
     return response.data as ProductResponse[]; // Since interceptor unwraps response.data, response is actually ApiResponse
   },
 
@@ -84,14 +94,37 @@ export const ProductService = {
     const response = await apiClient.get<ApiResponse<ProductResponse[]>>('/products/new', {
       params: { limit },
     });
-    // @ts-ignore
     return response.data as ProductResponse[];
+  },
+
+  getSaleProducts: async (limit: number = 12) => {
+    const response = await apiClient.get<ApiResponse<ProductResponse[]>>('/products/sale', {
+      params: { limit },
+    });
+    return response.data as ProductResponse[];
+  },
+
+  getAvailableSizes: async (params: {
+    categoryId?: number;
+    brandId?: number;
+    silhouetteId?: number;
+  }) => {
+    const response = await apiClient.get<ApiResponse<string[]>>('/products/available-sizes', { params });
+    return response.data as string[];
+  },
+
+  getFilterOptions: async () => {
+    const response = await apiClient.get<ApiResponse<ProductFilterOptionResponse[]>>('/products/filter-options');
+    return response.data as ProductFilterOptionResponse[];
   },
 
   filterProducts: async (params: {
     categoryId?: number;
     brandId?: number;
     silhouetteId?: number;
+    gender?: 'MEN' | 'WOMEN' | 'UNISEX' | 'KIDS';
+    onSale?: boolean;
+    variantSize?: string;
     minPrice?: number;
     maxPrice?: number;
     search?: string;
@@ -103,7 +136,6 @@ export const ProductService = {
     const response = await apiClient.get<ApiResponse<PaginatedResponse<ProductResponse>>>('/products', {
       params,
     });
-    // @ts-ignore
     return response.data as PaginatedResponse<ProductResponse>;
   },
 };

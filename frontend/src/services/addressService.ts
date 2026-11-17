@@ -1,11 +1,4 @@
-import axios from "axios";
-
-const API_URL = "http://localhost:8080/api/v1/addresses";
-
-const getAuthHeaders = () => {
-  const token = localStorage.getItem("token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
+import apiClient, { type ApiResponse } from "./api";
 
 export interface AddressRequest {
   recipientName: string;
@@ -24,30 +17,18 @@ export interface AddressResponse extends AddressRequest {
   id: number;
 }
 
-export const createAddress = async (address: AddressRequest) => {
-  const response = await axios.post(API_URL, address, {
-    headers: getAuthHeaders(),
-  });
-  return response.data;
+export const createAddress = async (address: AddressRequest): Promise<ApiResponse<AddressResponse>> => {
+  return apiClient.post<ApiResponse<AddressResponse>, AddressRequest>("/addresses", address);
 };
 
-export const getAddresses = async () => {
-  const response = await axios.get(API_URL, {
-    headers: getAuthHeaders(),
-  });
-  return response.data;
+export const getAddresses = async (): Promise<ApiResponse<AddressResponse[]>> => {
+  return apiClient.get<ApiResponse<AddressResponse[]>>("/addresses");
 };
 
 export const updateAddress = async (id: number, address: AddressRequest) => {
-  const response = await axios.put(`${API_URL}/${id}`, address, {
-    headers: getAuthHeaders(),
-  });
-  return response.data;
+  return apiClient.put<ApiResponse<AddressResponse>, AddressRequest>(`/addresses/${id}`, address);
 };
 
 export const deleteAddress = async (id: number) => {
-  const response = await axios.delete(`${API_URL}/${id}`, {
-    headers: getAuthHeaders(),
-  });
-  return response.data;
+  return apiClient.delete<ApiResponse<void>>(`/addresses/${id}`);
 };

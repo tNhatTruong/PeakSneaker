@@ -1,4 +1,4 @@
-import apiClient from "./api";
+import apiClient, { type ApiResponse } from "./api";
 
 export interface VoucherCheckRequest {
   code: string;
@@ -14,11 +14,14 @@ export interface VoucherCheckResponse {
 export interface VoucherResponse {
   id: number;
   code: string;
+  name?: string;
+  description?: string;
   discountType: string;
   discountValue: number;
   minOrderAmount: number;
   maxDiscountAmount: number;
   usageLimit: number;
+  perUserLimit?: number;
   usedCount: number;
   startAt: string;
   expireAt: string;
@@ -26,9 +29,9 @@ export interface VoucherResponse {
 }
 
 export interface PaginatedResponse<T> {
-  content: T[];
-  pageNo: number;
-  pageSize: number;
+  items: T[];
+  page: number;
+  size: number;
   totalElements: number;
   totalPages: number;
   last: boolean;
@@ -36,13 +39,15 @@ export interface PaginatedResponse<T> {
 
 export const VoucherService = {
   checkVoucher: async (data: VoucherCheckRequest) => {
-    return apiClient.post<VoucherCheckResponse>("/vouchers/check", data);
+    const response = await apiClient.post<ApiResponse<VoucherCheckResponse>>("/vouchers/check", data);
+    return response.data;
   },
   getVouchers: async (page = 0, size = 100) => {
-    return apiClient.post<PaginatedResponse<VoucherResponse>>("/vouchers", {
+    const response = await apiClient.post<ApiResponse<PaginatedResponse<VoucherResponse>>>("/vouchers", {
       page,
       size,
       isActive: true
     });
+    return response.data as PaginatedResponse<VoucherResponse>;
   }
 };
