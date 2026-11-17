@@ -7,6 +7,7 @@ import com.peaksneaker.entity.Order;
 import com.peaksneaker.entity.OrderItem;
 import com.peaksneaker.entity.OrderReturn;
 import com.peaksneaker.entity.OrderReturnItem;
+import com.peaksneaker.entity.ProductVariant;
 import com.peaksneaker.enums.PaymentMethod;
 import com.peaksneaker.enums.PaymentStatus;
 import com.peaksneaker.enums.ReturnReasonCode;
@@ -20,6 +21,7 @@ import com.peaksneaker.repository.OrderReturnRepository;
 import com.peaksneaker.repository.ProductVariantRepository;
 import com.peaksneaker.repository.UserRepository;
 import com.peaksneaker.service.EmailService;
+import com.peaksneaker.service.InventoryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -46,6 +48,7 @@ class OrderReturnServiceImplTest {
     @Mock private ProductVariantRepository productVariantRepository;
     @Mock private OrderReturnItemRepository orderReturnItemRepository;
     @Mock private InventoryAuditLogRepository inventoryAuditLogRepository;
+    @Mock private InventoryService inventoryService;
     @Mock private EmailService emailService;
     @Mock private ObjectMapper objectMapper;
 
@@ -144,5 +147,62 @@ class OrderReturnServiceImplTest {
         assertThat(returnItem.getRestockableQuantity()).isZero();
         assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
         verify(orderRepository).save(order);
+    }
+
+    @Test
+    void completingExchangeWithDefectiveZeroRestockableStillDeductsReplacementStockAndFifo() {
+        Order order = Order.builder()
+                .id(11L)
+                .orderCode("PS-TEST-011")
+                .subtotalAmount(new BigDecimal("3000000"))
+                .discountAmount(BigDecimal.ZERO)
+                .paymentMethod(PaymentMethod.COD)
+                .paymentStatus(PaymentStatus.PAID)
+                .build();
+        ProductVariant replacementVariant = ProductVariant.builder()
+                .id(501L)
+                .sku("NK-AF1-43")
+                .stockQuantity(5)
+                .build();
+        OrderItem orderItem = OrderItem.builder()
+                .id(101L)
+                .order(order)
+                .productName("Nike Air Force 1")
+                .quantity(1)
+                .unitPrice(new BigDecimal("3000000"))
+                .build();
+        OrderReturnItem returnItem = OrderReturnItem.builder()
+                .id(201L)
+                .orderItem(orderItem)
+                .requestedQuantity(1)
+                .approvedQuantity(1)
+                .receivedQuantity(1)
+                .restockableQuantity(0)
+                .replacementVariant(replacementVariant)
+                .build();
+        OrderReturn orderReturn = OrderReturn.builder()
+                .id(4L)
+                .order(order)
+                .returnType(ReturnType.EXCHANGE)
+                .reasonCode(ReturnReasonCode.DEFECTIVE_PRODUCT)
+                .reason("Bung keo mũi giày")
+                .status(ReturnStatus.GOODS_RECEIVED)
+                .refundAmount(BigDecimal.ZERO)
+                .items(new ArrayList<>(List.of(returnItem)))
+                .build();
+
+        when(orderReturnRepository.findById(4L)).thenReturn(Optional.of(orderReturn));
+        when(orderReturnRepository.save(orderReturn)).thenReturn(orderReturn);
+        when(productVariantRepository.findByIdWithLock(501L)).thenReturn(Optional.of(replacementVariant));
+
+        UpdateReturnStatusRequest request = new UpdateReturnStatusRequest();
+        request.setStatus(ReturnStatus.COMPLETED);
+
+        service.processReturn(4L, request, "admin@peaksneaker.com");
+
+        assertThat(replacementVariant.getStockQuantity()).isEqualTo(4);
+        assertThat(returnItem.getRestockedAt()).isNotNull();
+        verify(productVariantRepository).save(replacementVariant);
+        verify(inventoryService).deductBatchesFifo(501L, 1);
     }
 }

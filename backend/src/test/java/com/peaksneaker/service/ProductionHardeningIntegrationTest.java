@@ -1,18 +1,26 @@
 package com.peaksneaker.service;
 
 import com.peaksneaker.dto.request.AdminCreateOrderRequest;
+import com.peaksneaker.dto.request.CheckoutRequest;
 import com.peaksneaker.dto.request.CreateBatchRequest;
+import com.peaksneaker.dto.request.LoginRequest;
+import com.peaksneaker.dto.request.UpdateStaffPermissionsRequest;
 import com.peaksneaker.dto.request.UpdateStaffRoleRequest;
+import com.peaksneaker.dto.response.BatchResponse;
 import com.peaksneaker.dto.response.OrderResponse;
 import com.peaksneaker.dto.response.VnpayIpnResponse;
 import com.peaksneaker.entity.*;
 import com.peaksneaker.enums.*;
 import com.peaksneaker.exception.BadRequestException;
 import com.peaksneaker.repository.*;
+import com.peaksneaker.security.UserDetailsServiceImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,6 +68,24 @@ class ProductionHardeningIntegrationTest {
 
     @Autowired
     private OrderRepository orderRepository;
+
+    @Autowired
+    private InventoryService inventoryService;
+
+    @Autowired
+    private CartRepository cartRepository;
+
+    @Autowired
+    private AddressRepository addressRepository;
+
+    @Autowired
+    private AuthService authService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private UserDetailsServiceImpl userDetailsService;
 
     @Test
     @DisplayName("P0: Chặn hạ cấp và tự đổi vai trò của Quản trị viên tối cao (SUPER_ADMIN)")
@@ -278,5 +304,127 @@ class ProductionHardeningIntegrationTest {
         Order reloaded = orderRepository.findById(expiredOrder.getId()).orElseThrow();
         assertEquals(OrderStatus.CANCELLED, reloaded.getStatus());
         assertTrue(reloaded.getCancelReason().contains("15 phút"));
+    }
+
+    @Test
+    @DisplayName("P0: Cart Checkout khấu trừ lô FIFO và Phong tỏa lô hàng (Quarantine) đồng bộ tồn kho biến thể")
+    void testCartCheckoutDeductsFifoAndQuarantineSyncsVariantStock() {
+        Product product = productRepository.findAll().stream().findFirst().orElseThrow();
+        ProductVariant variant = productVariantRepository.save(ProductVariant.builder()
+                .product(product)
+                .sku("SKU-CART-FIFO-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase())
+                .color("Trắng")
+                .size("41")
+                .stockQuantity(15)
+                .priceAdjustment(BigDecimal.ZERO)
+                .build());
+
+        InventoryBatch batch = inventoryBatchRepository.save(InventoryBatch.builder()
+                .variant(variant)
+                .batchCode("BATCH-CART-" + UUID.randomUUID().toString().substring(0, 8))
+                .supplierName("Adidas VN")
+                .quantityImported(15)
+                .quantityRemaining(15)
+                .unitCost(BigDecimal.valueOf(1_200_000))
+                .isQuarantined(false)
+                .receivedDate(Instant.now().minus(1, ChronoUnit.DAYS))
+                .build());
+
+        User customer = userRepository.findAll().stream()
+                .filter(u -> Boolean.TRUE.equals(u.getIsActive()) && Boolean.TRUE.equals(u.getIsVerified()))
+                .findFirst()
+                .orElseThrow();
+
+        Address address = addressRepository.save(Address.builder()
+                .user(customer)
+                .recipientName("Khách Test Giỏ Hàng")
+                .phone("0911223344")
+                .provinceId(202)
+                .provinceName("TP. Hồ Chí Minh")
+                .districtId(1442)
+                .districtName("Quận 1")
+                .wardCode("20101")
+                .wardName("Phường Bến Nghé")
+                .streetDetail("100 Đồng Khởi")
+                .isDefault(false)
+                .build());
+
+        Cart cart = cartRepository.findByUser(customer).orElseGet(() -> cartRepository.save(Cart.builder()
+                .user(customer)
+                .build()));
+        cart.clear();
+        cart.addItem(variant, 4);
+        cartRepository.save(cart);
+
+        CheckoutRequest checkoutReq = new CheckoutRequest();
+        checkoutReq.setIdempotencyKey("CART-KEY-" + UUID.randomUUID().toString().substring(0, 12));
+        checkoutReq.setAddressId(address.getId());
+        checkoutReq.setPaymentMethod(PaymentMethod.COD);
+
+        Order order = orderService.checkout(customer.getId(), checkoutReq);
+        assertNotNull(order.getId());
+
+        // 1. Kiểm tra cả tồn kho biến thể và tồn kho lô FIFO đều giảm 4 (từ 15 còn 11)
+        ProductVariant variantAfterCheckout = productVariantRepository.findById(variant.getId()).orElseThrow();
+        InventoryBatch batchAfterCheckout = inventoryBatchRepository.findById(batch.getId()).orElseThrow();
+        assertEquals(11, variantAfterCheckout.getStockQuantity());
+        assertEquals(11, batchAfterCheckout.getQuantityRemaining());
+
+        // 2. Phong tỏa lô hàng (Quarantine = true) -> Tồn khả dụng của biến thể phải giảm đi 11 (còn 0)
+        BatchResponse quarantined = inventoryService.toggleQuarantine(batch.getId(), true, "Keo đế lỗi hàng loạt", "ADMIN");
+        assertTrue(quarantined.getIsQuarantined());
+        ProductVariant variantAfterQuarantine = productVariantRepository.findById(variant.getId()).orElseThrow();
+        assertEquals(0, variantAfterQuarantine.getStockQuantity());
+
+        // 3. Giải phóng phong tỏa (Quarantine = false) -> Tồn khả dụng của biến thể phục hồi về 11
+        BatchResponse unquarantined = inventoryService.toggleQuarantine(batch.getId(), false, "Đã kiểm định lại đạt chuẩn", "ADMIN");
+        assertFalse(unquarantined.getIsQuarantined());
+        ProductVariant variantAfterRelease = productVariantRepository.findById(variant.getId()).orElseThrow();
+        assertEquals(11, variantAfterRelease.getStockQuantity());
+    }
+
+    @Test
+    @DisplayName("P0: Chặn đăng nhập khi chưa xác thực OTP và đồng bộ quyền tùy biến user_permissions vào Spring Security")
+    void testUnverifiedLoginBlockedAndCustomPermissionsSyncedToSecurity() {
+        String email = "unverified_" + UUID.randomUUID().toString().substring(0, 6) + "@peaksneaker.com";
+        User unverifiedUser = userRepository.save(User.builder()
+                .email(email)
+                .passwordHash(passwordEncoder.encode("ValidPass@123"))
+                .firstName("Chưa")
+                .lastName("Xác Thực")
+                .phone("09" + String.format("%08d", Math.abs(UUID.randomUUID().hashCode()) % 100000000))
+                .role(Role.USER)
+                .isActive(true)
+                .isVerified(false)
+                .build());
+
+        LoginRequest loginReq = new LoginRequest();
+        loginReq.setEmail(email);
+        loginReq.setPassword("ValidPass@123");
+
+        // Chưa verify OTP -> Phải chặn đăng nhập
+        assertThrows(BadRequestException.class, () -> authService.login(loginReq));
+
+        // Sau khi kích hoạt OTP -> Đăng nhập thành công
+        unverifiedUser.setIsVerified(true);
+        userRepository.save(unverifiedUser);
+        var loginRes = authService.login(loginReq);
+        assertNotNull(loginRes.getToken());
+
+        // Kiểm tra nhân viên được cấp quyền tùy biến qua StaffService có hiệu lực trong UserDetailsServiceImpl
+        StaffProfile staffProfile = staffProfileRepository.findAll().stream()
+                .filter(sp -> sp.getUser() != null && sp.getUser().getRole() == Role.ROLE_WAREHOUSE)
+                .findFirst()
+                .orElseThrow();
+
+        UpdateStaffPermissionsRequest permReq = new UpdateStaffPermissionsRequest();
+        permReq.setPermissions(List.of("PROMOTION_MANAGE", "INVENTORY_VIEW"));
+        staffService.updateStaffPermissions(staffProfile.getId(), permReq, "admin@peaksneaker.com");
+
+        UserDetails loadedDetails = userDetailsService.loadUserByUsername(staffProfile.getUser().getEmail());
+        List<String> authorities = loadedDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .toList();
+        assertTrue(authorities.contains("PROMOTION_MANAGE"));
     }
 }
