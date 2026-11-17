@@ -140,18 +140,21 @@ export default function OrderDetailPage() {
   const handleBuyNow = (item: OrderItemResponse) => {
     const variantParts = (item.variantName ?? "").split("-");
     const buyNowItem = {
-      id: item.productVariantId, // Checkout component expects a variant or specific id
-      name: item.productName,
-      variant: {
-        id: item.productVariantId,
-        size: variantParts[1]?.trim() || "N/A",
-        color: variantParts[0]?.trim() || "N/A",
-      },
+      id: item.productVariantId,
+      productName: item.productName,
+      productThumbnail: item.imageUrl,
+      size: variantParts[1]?.trim() || "N/A",
+      color: variantParts[0]?.trim() || "N/A",
       price: item.unitPrice,
       quantity: 1,
-      imageUrl: item.imageUrl
     };
-    navigate('/checkout', { state: { buyNowVariantId: item.productVariantId, buyNowItem } });
+    navigate('/checkout', {
+      state: {
+        buyNowVariantId: item.productVariantId,
+        buyNowQuantity: 1,
+        buyNowItem,
+      },
+    });
   };
 
   const handleCancelOrder = async () => {
@@ -195,7 +198,7 @@ export default function OrderDetailPage() {
             <p className="text-sm text-zinc-500 mt-2">
               Đặt ngày {formatDateTime(order.createdAt)}
             </p>
-            {order.status === "COMPLETED" && (
+            {(order.status === "COMPLETED" || order.status === "DELIVERED") && (
               <div className="mt-3">
                 <Link
                   to={`/orders/${order.id}/return`}
@@ -257,7 +260,7 @@ export default function OrderDetailPage() {
                         </div>
                       </div>
                       
-                      {order.status === "COMPLETED" && (
+                      {(order.status === "COMPLETED" || order.status === "DELIVERED") && (
                         <div className="flex flex-wrap gap-2 pt-4 border-t border-zinc-100">
                           <button 
                             onClick={() => setReviewProductId(item.productId)}
