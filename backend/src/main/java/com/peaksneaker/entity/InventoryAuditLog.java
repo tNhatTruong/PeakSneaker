@@ -1,19 +1,18 @@
 package com.peaksneaker.entity;
 
-import com.peaksneaker.enums.InventoryTransactionType;
+import com.peaksneaker.enums.InventoryChangeType;
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.Instant;
 
 @Entity
-@Table(name = "inventory_transactions")
+@Table(name = "inventory_audit_logs")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class InventoryTransaction {
+public class InventoryAuditLog {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -21,17 +20,23 @@ public class InventoryTransaction {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "variant_id", nullable = false)
-    private ProductVariant productVariant;
-
-    @Column(nullable = false)
-    private Integer quantity;
+    private ProductVariant variant;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private InventoryTransactionType type;
+    @Column(name = "change_type", nullable = false, length = 50)
+    private InventoryChangeType changeType;
 
-    @Column(columnDefinition = "text")
-    private String note;
+    @Column(name = "quantity_changed", nullable = false)
+    private Integer quantityChanged;
+
+    @Column(name = "balance_after", nullable = false)
+    private Integer balanceAfter;
+
+    @Column(nullable = false, columnDefinition = "text")
+    private String reason;
+
+    @Column(name = "performed_by", length = 100)
+    private String performedBy;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default

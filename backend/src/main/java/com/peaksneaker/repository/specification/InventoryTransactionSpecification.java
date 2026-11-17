@@ -1,6 +1,6 @@
 package com.peaksneaker.repository.specification;
 
-import com.peaksneaker.entity.InventoryTransaction;
+import com.peaksneaker.entity.InventoryAuditLog;
 import com.peaksneaker.enums.InventoryTransactionType;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
@@ -11,7 +11,7 @@ import java.util.List;
 
 public class InventoryTransactionSpecification {
 
-    public static Specification<InventoryTransaction> filterTransactions(
+    public static Specification<InventoryAuditLog> filterTransactions(
             Long productId,
             Long variantId,
             InventoryTransactionType type,
@@ -23,20 +23,22 @@ public class InventoryTransactionSpecification {
 
             if (productId != null) {
                 predicates.add(criteriaBuilder.equal(
-                        root.get("productVariant").get("product").get("id"),
+                        root.get("variant").get("product").get("id"),
                         productId
                 ));
             }
 
             if (variantId != null) {
                 predicates.add(criteriaBuilder.equal(
-                        root.get("productVariant").get("id"),
+                        root.get("variant").get("id"),
                         variantId
                 ));
             }
 
             if (type != null) {
-                predicates.add(criteriaBuilder.equal(root.get("type"), type));
+                predicates.add(type == InventoryTransactionType.IMPORT
+                        ? criteriaBuilder.greaterThan(root.get("quantityChanged"), 0)
+                        : criteriaBuilder.lessThan(root.get("quantityChanged"), 0));
             }
 
             if (startDate != null) {
