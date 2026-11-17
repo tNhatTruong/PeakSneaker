@@ -68,6 +68,11 @@ export default function WishlistPage() {
               <article key={item.id} className="group relative">
                 <div className="relative aspect-square overflow-hidden bg-white">
                   <span className="absolute left-3 top-3 z-10 bg-zinc-950 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white">Saved {String(index + 1).padStart(2, "0")}</span>
+                  {(item.discountPercent ?? 0) > 0 && (
+                    <span className="absolute left-3 top-9 z-10 bg-red-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
+                      -{item.discountPercent}%
+                    </span>
+                  )}
                   <Link to={`/products/${item.productId}`} className="block h-full w-full">
                     {item.primaryImageUrl ? <img src={item.primaryImageUrl} alt={item.productName} className="h-full w-full object-contain p-5 transition-transform duration-500 group-hover:scale-105" /> : <ShoppingBag className="m-auto h-full w-12 text-zinc-300" />}
                   </Link>
@@ -80,7 +85,16 @@ export default function WishlistPage() {
                 <div className="mt-4">
                   <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">{item.brandName || "PeakSneaker"}</p>
                   <Link to={`/products/${item.productId}`} className="mt-1 block font-black leading-tight hover:underline">{item.productName}</Link>
-                  <p className="mt-2 text-sm font-bold">{formatPrice(item.basePrice)}</p>
+                  <div className="mt-2 flex items-baseline gap-2">
+                    <span className="text-sm font-black text-red-600">
+                      {formatPrice(item.price ?? item.basePrice)}
+                    </span>
+                    {(item.discountPercent ?? 0) > 0 && (
+                      <span className="text-xs font-semibold text-zinc-400 line-through">
+                        {formatPrice(item.basePrice)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </article>
             ))}

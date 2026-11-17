@@ -6,6 +6,8 @@ export interface WishlistItem {
   productName: string;
   productSlug: string;
   basePrice: number;
+  price?: number;
+  discountPercent?: number;
   brandName: string | null;
   primaryImageUrl: string | null;
   createdAt: string;

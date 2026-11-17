@@ -44,11 +44,12 @@ export default function ProductCard({
   // Badge determinations according to hierarchy
   const isSoldOut = totalStock != null && totalStock === 0;
   const isLowStock = !isSoldOut && totalStock != null && totalStock > 0 && totalStock <= 5;
-  const isSale = !isSoldOut && discountPercent != null && discountPercent > 0;
+  const hasDiscount = discountPercent != null && discountPercent > 0;
+  const isSale = !isSoldOut && hasDiscount;
   const isNewArrival = !isSoldOut && !isSale && isNew;
-  const isBestSeller = !isSoldOut && !isSale && !isNewArrival && isFeatured;
+  const isBestSeller = !isSoldOut && !isSale && !isNewArrival && isFeatured && (totalSold ?? 0) > 0;
 
-  const effectivePrice = isSale && (!price || price >= (basePrice || 0)) && (basePrice || 0) > 0
+  const effectivePrice = hasDiscount && (!price || price >= (basePrice || 0)) && (basePrice || 0) > 0
     ? Math.round((basePrice || 0) * (1 - discountPercent / 100))
     : price;
   const formattedPrice = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(effectivePrice);
@@ -193,7 +194,7 @@ export default function ProductCard({
           ) : null}
         </div>
         <Link to={`/products/${id}`} className="block text-sm font-bold leading-tight text-zinc-900 hover:underline line-clamp-1">{name}</Link>
-        {isSale && basePrice && basePrice > effectivePrice ? (
+        {hasDiscount && basePrice && basePrice > effectivePrice ? (
           <div className="flex items-baseline gap-2">
             <span className="text-sm font-black text-red-600">{formattedPrice}</span>
             <span className="text-xs text-zinc-400 line-through">

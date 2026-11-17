@@ -16,6 +16,8 @@ public class WishlistResponse {
     private String productName;
     private String productSlug;
     private BigDecimal basePrice;
+    private BigDecimal price;
+    private BigDecimal discountPercent;
     private String brandName;
     private String primaryImageUrl;
     private Instant createdAt;
@@ -28,6 +30,10 @@ public class WishlistResponse {
                 .productName(entity.getProduct() != null ? entity.getProduct().getName() : null)
                 .productSlug(entity.getProduct() != null ? entity.getProduct().getSlug() : null)
                 .basePrice(entity.getProduct() != null ? entity.getProduct().getBasePrice() : null)
+                .price(entity.getProduct() != null
+                        ? (entity.getProduct().getPrice() != null ? entity.getProduct().getPrice() : entity.getProduct().getBasePrice())
+                        : null)
+                .discountPercent(entity.getProduct() != null ? entity.getProduct().getDiscountPercent() : null)
                 .brandName(entity.getProduct() != null && entity.getProduct().getBrand() != null 
                         ? entity.getProduct().getBrand().getName() : null)
                 .primaryImageUrl(primaryImageUrl)
