@@ -1,6 +1,7 @@
-package com.peaksneaker.controller;
+package com.peaksneaker.controller.admin;
 
 import com.peaksneaker.dto.request.BrandRequest;
+import com.peaksneaker.dto.request.BrandVisibilityRequest;
 import com.peaksneaker.dto.response.ApiResponse;
 import com.peaksneaker.dto.response.BrandResponse;
 import com.peaksneaker.service.BrandService;
@@ -37,6 +38,14 @@ public class AdminBrandController {
             @Valid @ModelAttribute BrandRequest request) {
         BrandResponse brand = brandService.updateBrand(id, request);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật thương hiệu thành công", brand));
+    }
+
+    @PatchMapping("/{id}/visibility")
+    public ResponseEntity<ApiResponse<BrandResponse>> updateVisibility(
+            @PathVariable Long id,
+            @Valid @RequestBody BrandVisibilityRequest request) {
+        BrandResponse brand = brandService.updateVisibility(id, request.getIsActive());
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật hiển thị thương hiệu thành công", brand));
     }
 
     @DeleteMapping("/{id}")

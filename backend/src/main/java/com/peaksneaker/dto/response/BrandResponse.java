@@ -14,7 +14,11 @@ import java.util.List;
 public class BrandResponse {
     private Long id;
     private String name;
+    private String slug;
     private String logoUrl;
     private String description;
+    private Boolean isActive;
+    private Boolean isVisible;
+    private Long activeProductCount;
     private List<SilhouetteResponse> silhouettes;
 }

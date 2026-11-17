@@ -3,6 +3,7 @@ package com.peaksneaker.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -21,16 +22,33 @@ public class Brand {
     @Column(nullable = false, unique = true)
     private String name;
 
+    @Column(nullable = false, unique = true)
+    private String slug;
+
     @Column(name = "logo_url", length = 500)
     private String logoUrl;
 
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "is_deleted")
+    @Column(name = "is_active", nullable = false)
+    @Builder.Default
+    private Boolean isActive = true;
+
+    @Transient
     @Builder.Default
     private Boolean isDeleted = false;
 
     @OneToMany(mappedBy = "brand", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Silhouette> silhouettes;
+    @Builder.Default
+    private List<Silhouette> silhouettes = new ArrayList<>();
+
+    public Boolean getIsDeleted() {
+        return !Boolean.TRUE.equals(this.isActive);
+    }
+
+    public void setIsDeleted(Boolean isDeleted) {
+        this.isDeleted = isDeleted;
+        this.isActive = !Boolean.TRUE.equals(isDeleted);
+    }
 }
