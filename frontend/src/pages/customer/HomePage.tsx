@@ -83,16 +83,11 @@ export default function HomePage() {
 
         if (featuredResult.status === "fulfilled") {
           const raw = featuredResult.value;
-          // Sort to prioritize exact products matching mockup on page 1:
-          // [4 (New Balance 550), 1 (Nike AF1), 2 (Jordan 1 Low Bulls), 3 (Adidas Ultraboost)]
-          const primaryFeaturedOrder = [4, 1, 2, 3];
           const sorted = [...raw].sort((a, b) => {
-            const indexA = primaryFeaturedOrder.indexOf(a.id);
-            const indexB = primaryFeaturedOrder.indexOf(b.id);
-            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-            if (indexA !== -1) return -1;
-            if (indexB !== -1) return 1;
-            return a.id - b.id;
+            const aInStock = (a.totalStock ?? 0) > 0 ? 1 : 0;
+            const bInStock = (b.totalStock ?? 0) > 0 ? 1 : 0;
+            if (aInStock !== bInStock) return bInStock - aInStock;
+            return (b.totalSold ?? 0) - (a.totalSold ?? 0);
           });
           setBestSellers(sorted);
         } else {

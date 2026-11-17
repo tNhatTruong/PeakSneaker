@@ -124,6 +124,7 @@ export const ProductService = {
     silhouetteId?: number;
     gender?: 'MEN' | 'WOMEN' | 'UNISEX' | 'KIDS';
     onSale?: boolean;
+    inStockOnly?: boolean;
     variantSize?: string;
     minPrice?: number;
     maxPrice?: number;

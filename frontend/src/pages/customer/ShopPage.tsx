@@ -164,12 +164,8 @@ export default function ShopPage(): ReactElement {
   }, [hasInvalidFilter, inStockOnly, products]);
 
   const displayedProducts = filteredProducts;
-  const displayedTotalPages = inStockOnly
-    ? Math.ceil(filteredProducts.length / 12) || 1
-    : (hasInvalidFilter ? 0 : totalPages);
-  const displayedTotalElements = inStockOnly
-    ? filteredProducts.length
-    : (hasInvalidFilter ? 0 : totalElements);
+  const displayedTotalPages = hasInvalidFilter ? 0 : totalPages;
+  const displayedTotalElements = hasInvalidFilter ? 0 : totalElements;
 
   useEffect(() => {
     let isActive = true;
@@ -256,11 +252,12 @@ export default function ShopPage(): ReactElement {
       silhouetteId: selectedSilhouette?.id,
       gender: selectedGender || undefined,
       onSale: onSale || undefined,
+      inStockOnly: inStockOnly || undefined,
       variantSize: selectedSize || undefined,
       minPrice: minPrice ? Number.parseInt(minPrice, 10) : undefined,
       maxPrice: maxPrice ? Number.parseInt(maxPrice, 10) : undefined,
       search: searchKeyword,
-      sortBy,
+      sortBy: sortBy === "basePrice" ? "price" : sortBy,
       sortDirection,
       page,
       size: 12,
@@ -279,7 +276,7 @@ export default function ShopPage(): ReactElement {
     return () => {
       isActive = false;
     };
-  }, [areBaseFiltersLoaded, areSilhouettesLoaded, hasInvalidFilter, selectedCategory, selectedBrand, selectedSilhouette, selectedGender, selectedSize, minPrice, maxPrice, searchKeyword, sortBy, sortDirection, page, productQueryKey]);
+  }, [areBaseFiltersLoaded, areSilhouettesLoaded, hasInvalidFilter, selectedCategory, selectedBrand, selectedSilhouette, selectedGender, selectedSize, minPrice, maxPrice, searchKeyword, sortBy, sortDirection, page, inStockOnly, onSale, productQueryKey]);
 
   useEffect(() => {
     if (!isMobileFilterOpen) return;
@@ -370,7 +367,9 @@ export default function ShopPage(): ReactElement {
   const currentSortValue =
     (sortBy === "isFeatured" || sortBy === "totalSold") && sortDirection === "desc"
       ? "totalSold:desc"
-      : `${sortBy}:${sortDirection}`;
+      : sortBy === "basePrice"
+        ? `price:${sortDirection}`
+        : `${sortBy}:${sortDirection}`;
 
   const handleSortChange = useCallback((value: string) => {
     const [nextSortBy, nextSortDirection] = value.split(":");
@@ -417,8 +416,8 @@ export default function ShopPage(): ReactElement {
           >
             <option value="createdAt:desc">Mới nhất</option>
             <option value="totalSold:desc">Bán chạy nhất</option>
-            <option value="basePrice:asc">Giá tăng dần</option>
-            <option value="basePrice:desc">Giá giảm dần</option>
+            <option value="price:asc">Giá tăng dần</option>
+            <option value="price:desc">Giá giảm dần</option>
           </select>
         </label>
       </div>
