@@ -18,5 +18,6 @@ public class ProductVariantResponse {
     private String size;
     private Integer stock;
     private BigDecimal priceMultiplier;
+    private BigDecimal originalPrice;
     private BigDecimal finalPrice;
 }

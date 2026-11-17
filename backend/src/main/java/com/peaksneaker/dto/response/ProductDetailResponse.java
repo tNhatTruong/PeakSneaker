@@ -28,6 +28,7 @@ public class ProductDetailResponse {
     private Boolean isFeatured;
     private Boolean isNew;
     private Boolean isDeleted;
+    private Integer totalSold;
     private List<ImageResponse> images;
     private List<ProductVariantResponse> variants;
 }

@@ -20,6 +20,8 @@ public class CreateProductRequest {
 
     private String description;
 
+    private String attributes;
+
     @NotNull(message = "Gia san pham khong duoc de trong")
     @DecimalMin(value = "0", inclusive = false, message = "Gia san pham phai lon hon 0")
     private BigDecimal basePrice;

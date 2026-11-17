@@ -23,4 +23,6 @@ public class ProductResponse {
     private Boolean isNew;            // Tự tính toán dựa trên ngày tạo
     private Boolean isDeleted;
     private Integer totalStock;       // Tổng stockQuantity của tất cả variants
+    private String gender;            // MEN, WOMEN, UNISEX, KIDS
+    private Integer totalSold;        // Tổng số lượng đã bán thực tế từ CSDL
 }

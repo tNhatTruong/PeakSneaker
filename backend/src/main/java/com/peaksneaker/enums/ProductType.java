@@ -1,5 +1,7 @@
 package com.peaksneaker.enums;
 
 public enum ProductType {
-    SNEAKER, ACCESSORY
+    SNEAKER,
+    ACCESSORY,
+    SHOE_CARE
 }

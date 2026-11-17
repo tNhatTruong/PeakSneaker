@@ -13,6 +13,8 @@ public class UpdateProductRequest {
 
     private String description;
 
+    private String attributes;
+
     @DecimalMin(value = "0", inclusive = false, message = "Gia san pham phai lon hon 0")
     private BigDecimal basePrice;
 
