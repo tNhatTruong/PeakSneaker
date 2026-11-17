@@ -1,10 +1,11 @@
-import { User, Package, MapPin, Settings, Loader2, ShieldCheck } from "lucide-react";
+import { User, Package, MapPin, Settings, Loader2, ShieldCheck, LogOut } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import OrderHistoryPage from "./OrderHistoryPage";
 import AddressBookTab from "./AddressBookTab";
 import AccountSettingsTab from "./AccountSettingsTab";
 import { AuthService, isStaffOrAdminRole, getRoleDisplayName, type UserResponse } from "../../services/authService";
+import { useAuth } from "../../context/AuthContext";
 import toast from "react-hot-toast";
 
 export default function ProfilePage() {
@@ -12,6 +13,8 @@ export default function ProfilePage() {
   const [user, setUser] = useState<UserResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const navigate = useNavigate();
+  const { logout } = useAuth();
 
   // Form State
   const [firstName, setFirstName] = useState("");
@@ -59,6 +62,12 @@ export default function ProfilePage() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    toast.success("Đăng xuất thành công!");
+    navigate("/login");
   };
 
   if (loading) {
@@ -116,6 +125,13 @@ export default function ProfilePage() {
               </button>
               <button onClick={() => setActiveTab("settings")} className={`w-full flex items-center px-4 py-2.5 text-sm font-medium rounded-md transition-colors ${activeTab === 'settings' ? 'bg-black text-white' : 'text-zinc-600 hover:bg-zinc-100'}`}>
                 <Settings className="w-4 h-4 mr-3" /> Cài đặt tài khoản
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full flex items-center px-4 py-2.5 text-sm font-medium rounded-md transition-colors text-red-600 hover:bg-red-50 hover:text-red-700"
+              >
+                <LogOut className="w-4 h-4 mr-3" /> Đăng xuất
               </button>
             </nav>
           </div>

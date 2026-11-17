@@ -262,6 +262,44 @@ export default function Header() {
                     Trang Quản Trị (Admin)
                   </Link>
                 )}
+                {isAuthenticated ? (
+                  <div className="border-t border-zinc-100 pt-4 space-y-3">
+                    <Link
+                      to="/profile"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="text-sm font-bold text-zinc-900 uppercase tracking-wide hover:text-zinc-600 transition-colors flex items-center"
+                    >
+                      Hồ sơ ({user?.fullName || "Tôi"})
+                    </Link>
+                    <Link
+                      to="/orders"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="text-sm font-bold text-zinc-900 uppercase tracking-wide hover:text-zinc-600 transition-colors flex items-center"
+                    >
+                      Đơn mua
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="text-sm font-bold text-red-600 uppercase tracking-wide hover:text-red-500 transition-colors flex items-center w-full text-left"
+                    >
+                      Đăng xuất
+                    </button>
+                  </div>
+                ) : (
+                  <div className="border-t border-zinc-100 pt-4">
+                    <Link
+                      to="/login"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="text-sm font-bold text-zinc-900 uppercase tracking-wide hover:text-zinc-600 transition-colors flex items-center"
+                    >
+                      Đăng nhập / Đăng ký
+                    </Link>
+                  </div>
+                )}
               </div>
             </nav>
           </div>
