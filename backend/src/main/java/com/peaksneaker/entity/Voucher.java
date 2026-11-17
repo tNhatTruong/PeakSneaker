@@ -1,15 +1,17 @@
 package com.peaksneaker.entity;
 
 import com.peaksneaker.enums.DiscountType;
+import com.peaksneaker.enums.VoucherApplicationScope;
+import com.peaksneaker.enums.VoucherChannel;
+import com.peaksneaker.enums.VoucherStatus;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.SQLDelete;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 
 @Entity
 @Table(name = "vouchers")
-@SQLDelete(sql = "UPDATE vouchers SET is_deleted = true WHERE id=?")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -24,15 +26,36 @@ public class Voucher {
     @Column(nullable = false, unique = true, length = 50)
     private String code;
 
+    @Column(nullable = false, length = 160)
+    private String name;
+
+    @Column(columnDefinition = "text")
+    private String description;
+
     @Enumerated(EnumType.STRING)
-    @Column(name = "discount_type", nullable = false, columnDefinition = "varchar(50)")
-    private DiscountType discountType; // PERCENTAGE | FIXED
+    @Column(name = "discount_type", nullable = false, length = 20)
+    private DiscountType discountType; // PERCENTAGE | FIXED_AMOUNT | FIXED
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "application_scope", nullable = false, length = 30)
+    @Builder.Default
+    private VoucherApplicationScope applicationScope = VoucherApplicationScope.ALL_PRODUCTS;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "application_channel", nullable = false, length = 20)
+    @Builder.Default
+    private VoucherChannel applicationChannel = VoucherChannel.WEB;
+
+    @Column(name = "is_combinable", nullable = false)
+    @Builder.Default
+    private Boolean isCombinable = false;
 
     @Column(name = "discount_value", nullable = false, precision = 12, scale = 2)
     private BigDecimal discountValue;
 
-    @Column(name = "min_order_amount", precision = 12, scale = 2)
-    private BigDecimal minOrderAmount;
+    @Column(name = "min_order_amount", nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal minOrderAmount = BigDecimal.ZERO;
 
     @Column(name = "max_discount_amount", precision = 12, scale = 2)
     private BigDecimal maxDiscountAmount;
@@ -44,10 +67,14 @@ public class Voucher {
     @Builder.Default
     private Integer usedCount = 0;
 
-    @Column(name = "start_at")
+    @Column(name = "per_user_limit", nullable = false)
+    @Builder.Default
+    private Integer perUserLimit = 1;
+
+    @Column(name = "start_at", nullable = false)
     private Instant startAt;
 
-    @Column(name = "expire_at")
+    @Column(name = "expire_at", nullable = false)
     private Instant expireAt;
 
     @Column(name = "is_active", nullable = false)
@@ -58,11 +85,47 @@ public class Voucher {
     @Builder.Default
     private Instant createdAt = Instant.now();
 
-    @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
+    @Column(name = "updated_at", nullable = false)
+    @Builder.Default
+    private Instant updatedAt = Instant.now();
+
+    @Transient
     @Builder.Default
     private Boolean isDeleted = false;
 
-    // Kiểm tra xem mã giảm giá đã hết hạn hoặc chưa bắt đầu hiệu lực
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
+        if (minOrderAmount == null) {
+            minOrderAmount = BigDecimal.ZERO;
+        }
+        if (usedCount == null) {
+            usedCount = 0;
+        }
+        if (perUserLimit == null) {
+            perUserLimit = 1;
+        }
+        if (applicationScope == null) {
+            applicationScope = VoucherApplicationScope.ALL_PRODUCTS;
+        }
+        if (applicationChannel == null) {
+            applicationChannel = VoucherChannel.WEB;
+        }
+        if (isCombinable == null) {
+            isCombinable = false;
+        }
+        if (updatedAt == null) {
+            updatedAt = Instant.now();
+        }
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = Instant.now();
+    }
+
     public boolean isExpired() {
         Instant now = Instant.now();
         if (this.startAt != null && now.isBefore(this.startAt)) {
@@ -74,39 +137,43 @@ public class Voucher {
         return false;
     }
 
-    // Kiểm tra xem mã giảm giá đã chạm giới hạn lượt sử dụng tối đa chưa
+    public VoucherStatus getStatus() {
+        if (Boolean.FALSE.equals(this.isActive)) {
+            return VoucherStatus.PAUSED;
+        }
+
+        Instant now = Instant.now();
+        if (this.startAt != null && now.isBefore(this.startAt)) {
+            return VoucherStatus.UPCOMING;
+        }
+        if ((this.expireAt != null && now.isAfter(this.expireAt)) || isLimitReached()) {
+            return VoucherStatus.EXPIRED;
+        }
+        return VoucherStatus.ACTIVE;
+    }
+
     public boolean isLimitReached() {
         return this.usageLimit != null && this.usedCount >= this.usageLimit;
     }
 
-    // Kiểm tra toàn diện: coupon có được áp dụng cho đơn hàng này không
     public boolean isValidForOrder(BigDecimal orderSubtotal) {
         if (orderSubtotal == null) return false;
 
-        // kiểm tra trạng thái kích hoạt
         if (this.isActive == null || !this.isActive) {
             return false;
         }
-
-        // kiểm tra thời hạn hiệu lực
         if (isExpired()) {
             return false;
         }
-
-        // kiểm tra giới hạn lượt dùng
         if (isLimitReached()) {
             return false;
         }
-
-        // kiểm tra giá trị đơn hàng tối thiểu
         if (this.minOrderAmount != null && orderSubtotal.compareTo(this.minOrderAmount) < 0) {
             return false;
         }
-
         return true;
     }
 
-    // Tính số tiền được giảm thực tế; trả về 0 nếu coupon không hợp lệ
     public BigDecimal calculateDiscount(BigDecimal orderSubtotal) {
         if (orderSubtotal == null || !isValidForOrder(orderSubtotal)) {
             return BigDecimal.ZERO;
@@ -116,23 +183,20 @@ public class Voucher {
 
         switch (this.discountType) {
             case PERCENTAGE:
-                // Tính số tiền giảm theo phần trăm
-                BigDecimal fraction = this.discountValue.divide(BigDecimal.valueOf(100));
+                BigDecimal fraction = this.discountValue.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
                 discount = orderSubtotal.multiply(fraction);
-                // Áp trần giảm giá tối đa nếu có
-                if (this.maxDiscountAmount != null
-                        && discount.compareTo(this.maxDiscountAmount) > 0) {
+                if (this.maxDiscountAmount != null && discount.compareTo(this.maxDiscountAmount) > 0) {
                     discount = this.maxDiscountAmount;
                 }
                 break;
+            case FIXED_AMOUNT:
             case FIXED:
-                // Giảm một số tiền cố định
                 discount = this.discountValue;
                 break;
             default:
                 throw new IllegalStateException("Loại giảm giá không hợp lệ: " + this.discountType);
         }
-        // Đảm bảo giảm giá không vượt quá tổng đơn hàng
+
         if (discount.compareTo(orderSubtotal) > 0) {
             discount = orderSubtotal;
         }
@@ -140,7 +204,6 @@ public class Voucher {
         return discount;
     }
 
-    // Tăng số lượt đã dùng sau khi coupon được áp dụng thành công
     public void incrementUsage() {
         if (isLimitReached()) {
             throw new IllegalStateException("Mã giảm giá đã đạt giới hạn lượt sử dụng tối đa.");
@@ -150,5 +213,10 @@ public class Voucher {
         }
         this.usedCount++;
     }
-}
 
+    public void decrementUsage() {
+        if (this.usedCount != null && this.usedCount > 0) {
+            this.usedCount--;
+        }
+    }
+}

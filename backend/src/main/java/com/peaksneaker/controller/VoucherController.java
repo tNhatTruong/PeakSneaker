@@ -4,6 +4,8 @@ package com.peaksneaker.controller;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -12,9 +14,11 @@ import com.peaksneaker.dto.request.VoucherRequest;
 import com.peaksneaker.dto.response.ApiResponse;
 import com.peaksneaker.dto.response.VoucherResponse;
 import com.peaksneaker.dto.response.PaginatedResponse;
+import com.peaksneaker.dto.response.VoucherDetailResponse;
 import com.peaksneaker.service.VoucherService;
 
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("api/v1/vouchers")
@@ -28,8 +32,13 @@ public class VoucherController {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách voucher thành công", vouchers));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<VoucherDetailResponse>> getVoucher(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết khuyến mãi thành công", voucherService.getVoucher(id)));
+    }
+
     @PostMapping("/create")
-    public ResponseEntity<ApiResponse<VoucherResponse>> createVoucher(@RequestBody com.peaksneaker.dto.request.CreateVoucherRequest request) {
+    public ResponseEntity<ApiResponse<VoucherResponse>> createVoucher(@Valid @RequestBody com.peaksneaker.dto.request.CreateVoucherRequest request) {
         VoucherResponse voucher = voucherService.createVoucher(request);
         return ResponseEntity.ok(ApiResponse.success("Tạo voucher thành công", voucher));
     }
@@ -37,7 +46,7 @@ public class VoucherController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<VoucherResponse>> updateVoucher(
             @org.springframework.web.bind.annotation.PathVariable Long id,
-            @RequestBody com.peaksneaker.dto.request.CreateVoucherRequest request) {
+            @Valid @RequestBody com.peaksneaker.dto.request.CreateVoucherRequest request) {
         VoucherResponse voucher = voucherService.updateVoucher(id, request);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật voucher thành công", voucher));
     }
