@@ -401,7 +401,9 @@ export default function AdminAuditLogsPage() {
                 ) : (
                   items.map((log) => {
                     const meta = getActionMetadata(log.changeType);
-                    const delta = formatDelta(log.previousStock, log.currentStock);
+                    const prevStock = log.previousStock ?? log.balanceBefore;
+                    const currStock = log.currentStock ?? log.balanceAfter;
+                    const delta = formatDelta(prevStock, currStock);
                     const isSelected = selectedItem?.id === log.id;
                     const ActionIcon = meta.icon;
 
@@ -414,7 +416,7 @@ export default function AdminAuditLogsPage() {
                         }`}
                       >
                         <td className="whitespace-nowrap py-2.5 pl-4 pr-2 text-[11px] text-slate-500">
-                          {log.formattedCreatedAt || log.createdAt}
+                          {log.formattedCreatedAt || new Date(log.createdAt).toLocaleString('vi-VN')}
                         </td>
                         <td className="whitespace-nowrap px-2 py-2.5">
                           <span
@@ -439,7 +441,7 @@ export default function AdminAuditLogsPage() {
                             <span className="text-slate-400">—</span>
                           )}
                           <div className="text-[10px] text-slate-400">
-                            {log.previousStock ?? '—'} → {log.currentStock ?? '—'}
+                            {prevStock ?? '—'} → {currStock ?? '—'}
                           </div>
                         </td>
                         <td className="whitespace-nowrap px-2 py-2.5">
@@ -517,19 +519,22 @@ export default function AdminAuditLogsPage() {
                     <div className="rounded-lg bg-slate-50 p-2">
                       <p className="text-[10px] font-bold text-slate-400">Trước thao tác</p>
                       <p className="mt-1 text-base font-black text-slate-700">
-                        {selectedItem.previousStock ?? '—'}
+                        {selectedItem.previousStock ?? selectedItem.balanceBefore ?? '—'}
                       </p>
                     </div>
                     <div className="rounded-lg bg-slate-50 p-2">
                       <p className="text-[10px] font-bold text-slate-400">Biến động</p>
                       <p className="mt-1 text-base font-black text-slate-900">
-                        {formatDelta(selectedItem.previousStock, selectedItem.currentStock)?.text ?? '—'}
+                        {formatDelta(
+                          selectedItem.previousStock ?? selectedItem.balanceBefore,
+                          selectedItem.currentStock ?? selectedItem.balanceAfter
+                        )?.text ?? '—'}
                       </p>
                     </div>
                     <div className="rounded-lg bg-slate-50 p-2">
                       <p className="text-[10px] font-bold text-slate-400">Sau thao tác</p>
                       <p className="mt-1 text-base font-black text-slate-900">
-                        {selectedItem.currentStock ?? '—'}
+                        {selectedItem.currentStock ?? selectedItem.balanceAfter ?? '—'}
                       </p>
                     </div>
                   </div>
@@ -544,7 +549,7 @@ export default function AdminAuditLogsPage() {
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                     <span className="text-slate-500">Thời gian ghi nhận</span>
                     <span className="font-semibold text-slate-700">
-                      {selectedItem.formattedCreatedAt || selectedItem.createdAt}
+                      {selectedItem.formattedCreatedAt || new Date(selectedItem.createdAt).toLocaleString('vi-VN')}
                     </span>
                   </div>
                   {selectedItem.orderCode && (

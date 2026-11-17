@@ -8,12 +8,17 @@ import com.peaksneaker.enums.InventoryChangeType;
 import lombok.*;
 
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class AuditLogResponse {
+    private static final DateTimeFormatter VN_DATE_TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss").withZone(ZoneId.of("Asia/Ho_Chi_Minh"));
+
     private Long id;
     private Long variantId;
     private String variantSku;
@@ -27,9 +32,12 @@ public class AuditLogResponse {
     private Integer quantityChanged;
     private Integer balanceBefore;
     private Integer balanceAfter;
+    private Integer previousStock;
+    private Integer currentStock;
     private String reason;
     private String performedBy;
     private Instant createdAt;
+    private String formattedCreatedAt;
 
     public static AuditLogResponse fromEntity(InventoryAuditLog log) {
         if (log == null) return null;
@@ -45,6 +53,8 @@ public class AuditLogResponse {
                 : null;
         int balanceAfter = log.getBalanceAfter() != null ? log.getBalanceAfter() : 0;
         int quantityChanged = log.getQuantityChanged() != null ? log.getQuantityChanged() : 0;
+        int balanceBefore = Math.max(0, balanceAfter - quantityChanged);
+        Instant createdAt = log.getCreatedAt();
         return AuditLogResponse.builder()
                 .id(log.getId())
                 .variantId(variant != null ? variant.getId() : null)
@@ -57,13 +67,16 @@ public class AuditLogResponse {
                 .brandName(product != null && product.getBrand() != null ? product.getBrand().getName() : null)
                 .changeType(log.getChangeType())
                 .quantityChanged(quantityChanged)
-                .balanceBefore(Math.max(0, balanceAfter - quantityChanged))
+                .balanceBefore(balanceBefore)
                 .balanceAfter(balanceAfter)
+                .previousStock(balanceBefore)
+                .currentStock(balanceAfter)
                 .reason(log.getReason())
                 .performedBy(log.getPerformedBy() != null && !log.getPerformedBy().isBlank()
                         ? log.getPerformedBy()
                         : "SYSTEM")
-                .createdAt(log.getCreatedAt())
+                .createdAt(createdAt)
+                .formattedCreatedAt(createdAt != null ? VN_DATE_TIME_FORMATTER.format(createdAt) : null)
                 .build();
     }
 }

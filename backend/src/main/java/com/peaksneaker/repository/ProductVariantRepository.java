@@ -27,10 +27,10 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
 
     List<ProductVariant> findByStockQuantityLessThan(Integer threshold);
 
-    @Query("SELECT COUNT(v) FROM ProductVariant v WHERE v.stockQuantity <= :threshold AND v.product.isDeleted = false")
+    @Query("SELECT COUNT(v) FROM ProductVariant v WHERE v.stockQuantity <= COALESCE(v.safetyStockThreshold, :threshold) AND v.product.isDeleted = false")
     long countLowStockVariants(@Param("threshold") Integer threshold);
 
-    @Query("SELECT v FROM ProductVariant v WHERE v.stockQuantity <= :threshold AND v.product.isDeleted = false ORDER BY v.stockQuantity ASC, v.id ASC")
+    @Query("SELECT v FROM ProductVariant v WHERE v.stockQuantity <= COALESCE(v.safetyStockThreshold, :threshold) AND v.product.isDeleted = false ORDER BY v.stockQuantity ASC, v.id ASC")
     List<ProductVariant> findLowStockVariants(@Param("threshold") Integer threshold, Pageable pageable);
 
     @Query("""
