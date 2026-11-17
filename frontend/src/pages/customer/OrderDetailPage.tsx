@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ChevronLeft, Loader2, Package, Truck, CreditCard, CheckCircle2, Clock, MessageSquare, RefreshCw, X } from "lucide-react";
-import { getOrderById } from "../../services/orderService";
-import type { OrderResponse } from "../../services/orderService";
-import { format } from "date-fns";
+import { Loader2, Package, Truck, CreditCard, CheckCircle2, Clock, MessageSquare, RefreshCw, RotateCcw, X } from "lucide-react";
+import PageBackButton from "../../components/common/PageBackButton";
+import { cancelOrder, getOrderById, getOrderShipment } from "../../services/orderService";
+import { API_BASE_URL } from "../../services/api";
+import type { OrderItemResponse, OrderResponse, ShipmentResponse } from "../../services/orderService";
 import ReviewForm from "../../components/customer/ReviewForm";
+import toast from "react-hot-toast";
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -12,6 +14,8 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<OrderResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [shipment, setShipment] = useState<ShipmentResponse | null>(null);
   
   const [reviewProductId, setReviewProductId] = useState<number | null>(null);
 
@@ -22,6 +26,11 @@ export default function OrderDetailPage() {
         if (!id) return;
         const data = await getOrderById(Number(id));
         setOrder(data);
+        try {
+          setShipment(await getOrderShipment(Number(id)));
+        } catch {
+          setShipment(null);
+        }
       } catch (err) {
         console.error("Lỗi khi tải chi tiết đơn hàng:", err);
         setError("Không thể tải thông tin chi tiết đơn hàng hoặc bạn không có quyền xem.");
@@ -33,6 +42,17 @@ export default function OrderDetailPage() {
   }, [id]);
 
   const formatPrice = (price: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
+  const formatDateTime = (dateStr?: string | null) => {
+    if (!dateStr) return "N/A";
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? "N/A" : d.toLocaleString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  };
 
   if (loading) {
     return (
@@ -58,8 +78,10 @@ export default function OrderDetailPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "COMPLETED": return "bg-green-100 text-green-800 border-green-200";
-      case "DELIVERING": return "bg-blue-100 text-blue-800 border-blue-200";
+      case "DELIVERED": return "bg-teal-100 text-teal-800 border-teal-200";
+      case "SHIPPING": return "bg-blue-100 text-blue-800 border-blue-200";
       case "PROCESSING": return "bg-purple-100 text-purple-800 border-purple-200";
+      case "CONFIRMED": return "bg-sky-100 text-sky-800 border-sky-200";
       case "PENDING": return "bg-yellow-100 text-yellow-800 border-yellow-200";
       case "CANCELLED": return "bg-red-100 text-red-800 border-red-200";
       default: return "bg-zinc-100 text-zinc-800 border-zinc-200";
@@ -69,8 +91,10 @@ export default function OrderDetailPage() {
   const getStatusText = (status: string) => {
     switch (status) {
       case "COMPLETED": return "Đã giao hàng";
-      case "DELIVERING": return "Đang vận chuyển";
+      case "DELIVERED": return "Đã giao";
+      case "SHIPPING": return "Đang giao";
       case "PROCESSING": return "Đang xử lý";
+      case "CONFIRMED": return "Đã xác nhận";
       case "PENDING": return "Chờ xác nhận";
       case "CANCELLED": return "Đã hủy";
       default: return status;
@@ -80,6 +104,7 @@ export default function OrderDetailPage() {
   const getPaymentStatusText = (status: string) => {
     switch (status) {
       case "PAID": return "Đã thanh toán";
+      case "UNPAID": return "Chưa thanh toán";
       case "PENDING": return "Chờ thanh toán";
       case "FAILED": return "Thanh toán thất bại";
       case "REFUNDED": return "Đã hoàn tiền";
@@ -87,14 +112,40 @@ export default function OrderDetailPage() {
     }
   };
 
-  const handleBuyNow = (item: any) => {
+  const getShipmentStatusText = (status: string) => ({
+    ready_to_pick: "Đã tạo vận đơn, chờ GHN lấy hàng",
+    picking: "GHN đang lấy hàng",
+    money_collect_picking: "GHN đang lấy hàng và thu tiền",
+    picked: "GHN đã lấy hàng",
+    storing: "Đang lưu kho trung chuyển",
+    transporting: "Đang vận chuyển",
+    sorting: "Đang phân loại",
+    delivering: "Đang giao đến người nhận",
+    money_collect_delivering: "Đang giao và thu hộ COD",
+    delivered: "Giao hàng thành công",
+    delivery_fail: "Giao hàng chưa thành công",
+    waiting_to_return: "Đang chờ hoàn hàng",
+    return: "Bắt đầu hoàn hàng",
+    return_transporting: "Đang vận chuyển hàng hoàn",
+    return_sorting: "Đang phân loại hàng hoàn",
+    returning: "Đang hoàn về cửa hàng",
+    return_fail: "Hoàn hàng chưa thành công",
+    returned: "Cửa hàng đã nhận lại hàng",
+    cancel: "Vận đơn đã hủy",
+    exception: "Vận đơn cần được kiểm tra",
+    damage: "Hàng hóa được ghi nhận hư hỏng",
+    lost: "Hàng hóa được ghi nhận thất lạc",
+  }[status.toLowerCase()] ?? status);
+
+  const handleBuyNow = (item: OrderItemResponse) => {
+    const variantParts = (item.variantName ?? "").split("-");
     const buyNowItem = {
       id: item.productVariantId, // Checkout component expects a variant or specific id
       name: item.productName,
       variant: {
         id: item.productVariantId,
-        size: item.variantName.split('-')[1]?.trim() || "N/A",
-        color: item.variantName.split('-')[0]?.trim() || "N/A",
+        size: variantParts[1]?.trim() || "N/A",
+        color: variantParts[0]?.trim() || "N/A",
       },
       price: item.unitPrice,
       quantity: 1,
@@ -103,33 +154,69 @@ export default function OrderDetailPage() {
     navigate('/checkout', { state: { buyNowVariantId: item.productVariantId, buyNowItem } });
   };
 
+  const handleCancelOrder = async () => {
+    if (!window.confirm("Bạn có chắc muốn hủy đơn hàng này? Tồn kho sẽ được hoàn lại.")) return;
+    setIsCancelling(true);
+    try {
+      const updatedOrder = await cancelOrder(order.id);
+      setOrder(updatedOrder);
+      toast.success("Đã hủy đơn hàng và hoàn lại tồn kho.");
+    } catch (cancelError: unknown) {
+      const message = typeof cancelError === "object" && cancelError !== null && "response" in cancelError
+        ? (cancelError as { response?: { data?: { message?: string } } }).response?.data?.message
+        : null;
+      toast.error(message || "Không thể hủy đơn hàng.");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 md:px-8 py-10 max-w-5xl">
       {/* Header */}
       <div className="mb-8">
-        <Link to="/orders" className="inline-flex items-center text-sm font-semibold text-zinc-500 hover:text-zinc-900 transition-colors mb-4 uppercase tracking-widest">
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Quay lại Lịch sử
-        </Link>
+        <PageBackButton fallbackTo="/orders" label="Quay lại Lịch sử đơn hàng" className="mb-6" />
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
           <div>
             <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tighter text-zinc-900">
               Chi tiết đơn hàng
             </h1>
             <p className="text-zinc-500 mt-2 font-mono text-lg bg-zinc-50 px-2 py-1 rounded inline-block border border-zinc-200">
-              #{order.id}
+              {order.orderCode || `#${order.id}`}
             </p>
           </div>
           <div className="text-right">
             <span className={`px-3 py-1.5 text-xs font-bold uppercase tracking-widest border rounded inline-flex items-center ${getStatusColor(order.status)}`}>
-              {order.status === "COMPLETED" ? <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> : 
-               order.status === "DELIVERING" ? <Truck className="w-3.5 h-3.5 mr-1.5" /> : 
+              {order.status === "COMPLETED" ? <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> :
+               order.status === "SHIPPING" || order.status === "DELIVERED" ? <Truck className="w-3.5 h-3.5 mr-1.5" /> :
                <Clock className="w-3.5 h-3.5 mr-1.5" />}
               {getStatusText(order.status)}
             </span>
             <p className="text-sm text-zinc-500 mt-2">
-              Đặt ngày {order.createdAt ? format(new Date(order.createdAt), "dd/MM/yyyy HH:mm") : "N/A"}
+              Đặt ngày {formatDateTime(order.createdAt)}
             </p>
+            {order.status === "COMPLETED" && (
+              <div className="mt-3">
+                <Link
+                  to={`/orders/${order.id}/return`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-wider bg-zinc-900 hover:bg-zinc-800 text-white rounded-md transition"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Yêu cầu Đổi / Trả (RMA)
+                </Link>
+              </div>
+            )}
+            {(order.status === "PENDING" || order.status === "CONFIRMED") && (
+              <button
+                type="button"
+                onClick={() => void handleCancelOrder()}
+                disabled={isCancelling}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-red-200 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <X className="h-3.5 w-3.5" />
+                {isCancelling ? "Đang hủy..." : "Hủy đơn hàng"}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -144,7 +231,7 @@ export default function OrderDetailPage() {
                 <div key={item.id} className="flex flex-col sm:flex-row gap-6 p-4 rounded-xl border border-zinc-100 hover:border-zinc-300 hover:shadow-sm transition-all bg-white group">
                   <div className="w-full sm:w-36 h-36 bg-zinc-50 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
                     <img 
-                      src={item.imageUrl ? (item.imageUrl.startsWith("http") ? item.imageUrl : `http://localhost:8080/api/v1/images/${item.imageUrl}`) : `https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=500&q=80`} 
+                      src={item.imageUrl ? (item.imageUrl.startsWith("http") ? item.imageUrl : `${API_BASE_URL}/images/${item.imageUrl}`) : `https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=500&q=80`}
                       alt={item.productName} 
                       className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500`}
                       onError={(e) => {
@@ -192,6 +279,31 @@ export default function OrderDetailPage() {
               ))}
             </div>
           </div>
+
+          {shipment && (
+            <section className="rounded-2xl border border-zinc-200 bg-white p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-black uppercase tracking-tight text-zinc-900">Hành trình giao hàng</h3>
+                  <p className="mt-1 text-sm text-zinc-500">GHN · {shipment.providerOrderCode}</p>
+                </div>
+                <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">
+                  {getShipmentStatusText(shipment.providerStatus)}
+                </span>
+              </div>
+              <ol className="mt-5 space-y-4 border-l border-zinc-200 pl-5">
+                {shipment.events.length === 0 ? (
+                  <li className="text-sm text-zinc-500">Vận đơn đã được tạo, đang chờ cập nhật từ GHN.</li>
+                ) : shipment.events.filter((event) => event.applied).map((event) => (
+                  <li key={event.id} className="relative">
+                    <span className="absolute -left-[25px] top-1.5 h-2.5 w-2.5 rounded-full bg-blue-600 ring-4 ring-white" />
+                    <p className="text-sm font-bold text-zinc-800">{getShipmentStatusText(event.providerStatus)}</p>
+                    <p className="mt-1 text-xs text-zinc-400">{formatDateTime(event.occurredAt)}</p>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
           
           {/* Order Note */}
           {order.note && (

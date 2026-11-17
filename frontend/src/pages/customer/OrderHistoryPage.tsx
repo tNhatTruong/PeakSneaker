@@ -1,9 +1,9 @@
 import { Package, Search, ChevronRight, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
+import PageBackButton from "../../components/common/PageBackButton";
 import { getOrders } from "../../services/orderService";
 import type { OrderResponse } from "../../services/orderService";
-import { format } from "date-fns";
 
 export default function OrderHistoryPage() {
   const [orders, setOrders] = useState<OrderResponse[]>([]);
@@ -28,15 +28,38 @@ export default function OrderHistoryPage() {
 
   const filteredOrders = (orders || []).filter(order => 
     order?.id?.toString().includes(searchQuery)
+      || order.orderCode?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const formatPrice = (price: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
+  const formatDateTime = (dateStr?: string | null) => {
+    if (!dateStr) return "---";
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? "---" : d.toLocaleString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  };
+  const formatDateOnly = (dateStr?: string | null) => {
+    if (!dateStr) return "---";
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? "---" : d.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    });
+  };
 
   const getStatusInfo = (status: string) => {
     switch (status) {
       case "COMPLETED": return { color: "bg-green-100 text-green-800 border-green-200", text: "Đã giao hàng" };
-      case "DELIVERING": return { color: "bg-blue-100 text-blue-800 border-blue-200", text: "Đang vận chuyển" };
+      case "DELIVERED": return { color: "bg-teal-100 text-teal-800 border-teal-200", text: "Đã giao" };
+      case "SHIPPING": return { color: "bg-blue-100 text-blue-800 border-blue-200", text: "Đang giao" };
       case "PROCESSING": return { color: "bg-purple-100 text-purple-800 border-purple-200", text: "Đang xử lý" };
+      case "CONFIRMED": return { color: "bg-sky-100 text-sky-800 border-sky-200", text: "Đã xác nhận" };
       case "PENDING": return { color: "bg-yellow-100 text-yellow-800 border-yellow-200", text: "Chờ xác nhận" };
       case "CANCELLED": return { color: "bg-red-100 text-red-800 border-red-200", text: "Đã hủy" };
       default: return { color: "bg-zinc-100 text-zinc-800 border-zinc-200", text: status };
@@ -45,6 +68,7 @@ export default function OrderHistoryPage() {
 
   return (
     <div className="container mx-auto px-4 md:px-8 py-10 max-w-5xl min-h-[70vh]">
+      <PageBackButton fallbackTo="/shop" label="Tiếp tục mua sắm" className="mb-6" />
       <div className="mb-10 text-center md:text-left">
         <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tighter text-zinc-900">
           Lịch Sử Đơn Hàng
@@ -114,9 +138,9 @@ export default function OrderHistoryPage() {
                     
                     return (
                     <tr key={order.id} className="border-b border-zinc-200 hover:bg-zinc-50 transition-colors group">
-                      <td className="py-4 px-3 font-bold text-zinc-900">#{order.id}</td>
+                      <td className="py-4 px-3 font-bold text-zinc-900">{order.orderCode || `#${order.id}`}</td>
                       <td className="py-4 px-3 text-zinc-600">
-                        {order.createdAt ? format(new Date(order.createdAt), "dd/MM/yyyy HH:mm") : "---"}
+                        {formatDateTime(order.createdAt)}
                       </td>
                       <td className="py-4 px-3 text-zinc-600">{itemCount} sản phẩm</td>
                       <td className="py-4 px-3 font-black text-zinc-900">{formatPrice(order.finalAmount)}</td>
@@ -147,13 +171,13 @@ export default function OrderHistoryPage() {
                  return (
                 <div key={order.id} className="border border-zinc-200 p-5 bg-white rounded flex flex-col gap-4 shadow-sm">
                   <div className="flex justify-between items-center">
-                    <span className="font-black text-zinc-900">#{order.id}</span>
+                    <span className="font-black text-zinc-900">{order.orderCode || `#${order.id}`}</span>
                     <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider border rounded ${statusInfo.color}`}>
                       {statusInfo.text}
                     </span>
                   </div>
                   <div className="text-xs text-zinc-500 flex justify-between bg-zinc-50 p-3 rounded border border-zinc-100">
-                    <span>{order.createdAt ? format(new Date(order.createdAt), "dd/MM/yyyy") : "---"}</span>
+                    <span>{formatDateOnly(order.createdAt)}</span>
                     <span className="font-medium text-zinc-700">{itemCount} sản phẩm</span>
                   </div>
                   <div className="flex justify-between items-center pt-3 border-t border-zinc-100">
@@ -174,4 +198,3 @@ export default function OrderHistoryPage() {
 }
 
 // Helper inline components for icons inside badge
-
