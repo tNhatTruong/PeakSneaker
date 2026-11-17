@@ -4,6 +4,8 @@ import com.peaksneaker.enums.Role;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "users")
@@ -21,7 +23,7 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(name = "password_hash", nullable = false)
+    @Column(name = "password_hash")
     private String passwordHash;
 
     @Column(name = "first_name", nullable = false, length = 100)
@@ -33,62 +35,79 @@ public class User {
     @Column(unique = true, length = 20)
     private String phone;
 
+    @Column(name = "avatar_url", length = 500)
+    private String avatarUrl;
+
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, columnDefinition = "varchar(50)")
+    @Column(nullable = false, length = 50)
     @Builder.Default
-    private Role role = Role.USER; //USER ,ADMIN
+    private Role role = Role.ROLE_CUSTOMER;
+
+    @Column(name = "google_id", unique = true, length = 100)
+    private String googleId;
 
     @Column(name = "is_verified", nullable = false)
     @Builder.Default
     private Boolean isVerified = false;
 
-    @Column(name = "has_password", columnDefinition = "boolean default true")
-    @Builder.Default
-    private Boolean hasPassword = true;
-
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private Boolean isActive = true;
 
+    @Transient
+    @Builder.Default
+    private Boolean hasPassword = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private Instant createdAt = Instant.now();
+
+    @Column(name = "updated_at", nullable = false)
+    @Builder.Default
+    private Instant updatedAt = Instant.now();
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Cart cart;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
-    private java.util.List<Address> addresses = new java.util.ArrayList<>();
+    private List<Address> addresses = new ArrayList<>();
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
-    private java.util.List<Order> orders = new java.util.ArrayList<>();
+    private List<Order> orders = new ArrayList<>();
 
-    @Transient
-    private String fullname;
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
+        if (updatedAt == null) {
+            updatedAt = Instant.now();
+        }
+    }
 
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = Instant.now();
+    }
 
-    // Bật cờ xác thực danh tính sau khi người dùng xác nhận qua Email/OTP
     public void verify() {
         this.isVerified = true;
     }
 
-    // Đình chỉ tài khoản người dùng vi phạm (bùng đơn, gian lận...)
     public void block() {
         this.isActive = false;
     }
 
-    // Kích hoạt lại tài khoản sau khi đã bị đình chỉ
     public void activate() {
         this.isActive = true;
     }
 
     public boolean isAdmin() {
-        return this.role == Role.ADMIN;
+        return this.role == Role.ROLE_ADMIN || this.role == Role.ADMIN;
     }
 
-    // Cập nhật thông tin hồ sơ cá nhân, bỏ qua các trường null hoặc rỗng
     public void updateProfile(String firstName, String lastName, String phone) {
         if (firstName != null && !firstName.trim().isEmpty()) {
             this.firstName = firstName.trim();
@@ -101,8 +120,11 @@ public class User {
         }
     }
 
-    public String getFullname(){
-        return this.firstName + " " + this.lastName;
+    public String getFullname() {
+        return (this.firstName != null ? this.firstName : "") + " " + (this.lastName != null ? this.lastName : "");
+    }
+
+    public Boolean getHasPassword() {
+        return passwordHash != null && !passwordHash.isBlank();
     }
 }
-
