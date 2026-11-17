@@ -12,6 +12,20 @@ import { checkout, type CheckoutRequest } from "../../services/orderService";
 import { VoucherService } from "../../services/voucherService";
 import PageBackButton from "../../components/common/PageBackButton";
 
+interface BuyNowLocationState {
+  buyNowVariantId?: number;
+  buyNowQuantity?: number;
+  buyNowItem?: {
+    id: number;
+    productName: string;
+    productThumbnail?: string;
+    size: string;
+    color: string;
+    price: number;
+    quantity: number;
+  };
+}
+
 export default function CheckoutPage() {
   const checkoutKeyRef = useRef(crypto.randomUUID());
   const [paymentMethod, setPaymentMethod] = useState("VNPAY");
@@ -20,7 +34,7 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const buyNowState = location.state as any;
+  const buyNowState = location.state as BuyNowLocationState | null;
   const isBuyNow = !!buyNowState?.buyNowVariantId;
   const buyNowItem = buyNowState?.buyNowItem;
 
@@ -68,29 +82,6 @@ export default function CheckoutPage() {
     }
   }, [cart, loading, navigate, isBuyNow, isOrderSuccessful]);
 
-  useEffect(() => {
-    // Load Provinces on mount
-    getProvinces().then((res) => {
-      if (res && res.data) {
-        setProvinces(res.data);
-      }
-    }).catch(err => console.error(err));
-
-    // Load user addresses only if authenticated
-    if (isAuthenticated) {
-      getAddresses().then(res => {
-        if (res && res.data) {
-          setAddressBook(res.data);
-          // Tự động điền địa chỉ mặc định
-          const defaultAddr = res.data.find((a: AddressResponse) => a.isDefault);
-          if (defaultAddr) {
-            handleSelectAddress(defaultAddr);
-          }
-        }
-      }).catch(console.error);
-    }
-  }, [isAuthenticated]);
-
   const handleSelectAddress = async (addr: AddressResponse) => {
     setSelectedAddressId(addr.id);
     setRecipientName(addr.recipientName);
@@ -119,6 +110,29 @@ export default function CheckoutPage() {
     }
     setShowAddressModal(false);
   };
+
+  useEffect(() => {
+    // Load Provinces on mount
+    getProvinces().then((res) => {
+      if (res && res.data) {
+        setProvinces(res.data);
+      }
+    }).catch(err => console.error(err));
+
+    // Load user addresses only if authenticated
+    if (isAuthenticated) {
+      getAddresses().then(res => {
+        if (res && res.data) {
+          setAddressBook(res.data);
+          // Tự động điền địa chỉ mặc định
+          const defaultAddr = res.data.find((a: AddressResponse) => a.isDefault);
+          if (defaultAddr) {
+            void handleSelectAddress(defaultAddr);
+          }
+        }
+      }).catch(console.error);
+    }
+  }, [isAuthenticated]);
 
   const handleProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const provinceId = e.target.value;
@@ -169,7 +183,7 @@ export default function CheckoutPage() {
   };
 
   const cartItems = isBuyNow && buyNowItem ? [buyNowItem] : (cart?.items || []);
-  const subtotal = isBuyNow && buyNowItem ? buyNowItem.price : (cart?.totalPrice || 0);
+  const subtotal = isBuyNow && buyNowItem ? buyNowItem.price * (buyNowItem.quantity || 1) : (cart?.totalPrice || 0);
   
   const handleApplyVoucher = async () => {
     if (!voucherCode.trim()) {
@@ -180,7 +194,7 @@ export default function CheckoutPage() {
     setIsCheckingVoucher(true);
     try {
       const res = await VoucherService.checkVoucher({ code: voucherCode, subtotal });
-      if (res.isValid) {
+      if (res.isValid ?? res.valid) {
         setAppliedVoucher(voucherCode);
         setDiscountAmount(res.discountAmount);
         toast.success(res.message);
@@ -189,10 +203,11 @@ export default function CheckoutPage() {
         setDiscountAmount(0);
         toast.error(res.message);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setAppliedVoucher(null);
       setDiscountAmount(0);
-      toast.error(err.response?.data?.message || "Lỗi khi kiểm tra mã giảm giá");
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || "Lỗi khi kiểm tra mã giảm giá");
     } finally {
       setIsCheckingVoucher(false);
     }
@@ -204,7 +219,9 @@ export default function CheckoutPage() {
     setDiscountAmount(0);
   };
 
-  const total = subtotal + shippingFee - discountAmount;
+  const isFreeShipping = subtotal >= 2000000;
+  const effectiveShippingFee = isFreeShipping ? 0 : shippingFee;
+  const total = Math.max(0, subtotal + effectiveShippingFee - discountAmount);
 
   const formatPrice = (price: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
 
@@ -495,7 +512,15 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex justify-between text-zinc-600">
                   <span>Phí vận chuyển</span>
-                  <span className="font-medium text-zinc-900">{shippingFee > 0 ? formatPrice(shippingFee) : '---'}</span>
+                  <span className="font-medium text-zinc-900">
+                    {isFreeShipping ? (
+                      <span className="text-emerald-600 font-bold">Miễn phí (Đơn ≥ 2.000.000 ₫)</span>
+                    ) : effectiveShippingFee > 0 ? (
+                      formatPrice(effectiveShippingFee)
+                    ) : (
+                      '---'
+                    )}
+                  </span>
                 </div>
                 {discountAmount > 0 && (
                   <div className="flex justify-between text-green-600 font-semibold">

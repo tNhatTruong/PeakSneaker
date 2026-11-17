@@ -88,7 +88,13 @@ public class OrderServiceImpl implements OrderService {
                 || address.getWardCode() == null || address.getWardCode().isBlank()) {
             throw new BadRequestException("Địa chỉ giao hàng chưa có mã quận/huyện hoặc phường/xã hợp lệ cho GHN.");
         }
-        BigDecimal shippingFee = ghnService.calculateFeeAmount(address.getDistrictId(), address.getWardCode());
+        BigDecimal shippingFee;
+        try {
+            shippingFee = ghnService.calculateFeeAmount(address.getDistrictId(), address.getWardCode());
+        } catch (Exception ex) {
+            log.warn("Không thể lấy phí GHN tự động khi checkout, áp dụng phí mặc định 30.000đ: {}", ex.getMessage());
+            shippingFee = BigDecimal.valueOf(30_000);
+        }
 
         Voucher voucher = null;
         if (request.getVoucherCode() != null && !request.getVoucherCode().trim().isEmpty()) {
@@ -181,6 +187,7 @@ public class OrderServiceImpl implements OrderService {
 
                 variant.setStockQuantity(variant.getStockQuantity() - qty);
                 productVariantRepository.save(variant);
+                inventoryService.deductBatchesFifo(variant.getId(), qty);
 
                 Product product = variant.getProduct();
                 String imageUrl = resolveProductImageUrl(product);
@@ -203,6 +210,10 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.calculateTotals(order.getShippingFee());
+        if (order.getSubtotalAmount() != null
+                && order.getSubtotalAmount().compareTo(BigDecimal.valueOf(2_000_000)) >= 0) {
+            order.calculateTotals(BigDecimal.ZERO);
+        }
 
         if (voucher != null) {
             if (!voucher.isValidForOrder(order.getSubtotalAmount())) {
@@ -365,6 +376,10 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.calculateTotals(order.getShippingFee());
+        if (order.getSubtotalAmount() != null
+                && order.getSubtotalAmount().compareTo(BigDecimal.valueOf(2_000_000)) >= 0) {
+            order.calculateTotals(BigDecimal.ZERO);
+        }
 
         if (voucher != null) {
             if (!voucher.isValidForOrder(order.getSubtotalAmount())) {

@@ -49,11 +49,31 @@ public class GhnServiceImpl implements GhnService {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public Object getProvinces() {
         String url = "https://dev-online-gateway.ghn.vn/shiip/public-api/master-data/province";
         HttpEntity<String> entity = new HttpEntity<>(createHeaders());
         ResponseEntity<Object> response = restTemplate.exchange(url, HttpMethod.GET, entity, Object.class);
-        return response.getBody();
+        Object body = response.getBody();
+        if (body instanceof Map<?, ?> rawMap && rawMap.get("data") instanceof List<?> rawList) {
+            List<?> filtered = rawList.stream()
+                    .filter(item -> {
+                        if (!(item instanceof Map<?, ?> province)) return true;
+                        Object nameObj = province.get("ProvinceName");
+                        if (nameObj == null) return false;
+                        String name = nameObj.toString().trim();
+                        String lower = name.toLowerCase();
+                        if (lower.contains("test") || lower.contains("alert") || lower.contains("ngưng hoạt động")) {
+                            return false;
+                        }
+                        return !name.matches(".*\\s+\\d+$");
+                    })
+                    .toList();
+            Map<String, Object> sanitized = new HashMap<>((Map<String, Object>) rawMap);
+            sanitized.put("data", filtered);
+            return sanitized;
+        }
+        return body;
     }
 
     @Override

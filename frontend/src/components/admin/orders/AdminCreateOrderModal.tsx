@@ -232,7 +232,9 @@ export default function AdminCreateOrderModal({
     [selectedItems],
   );
 
-  const estimatedTotal = subtotal + (selectedItems.length > 0 ? shippingFee : 0);
+  const isFreeShipping = subtotal >= 2_000_000;
+  const effectiveShippingFee = isFreeShipping ? 0 : shippingFee;
+  const estimatedTotal = subtotal + (selectedItems.length > 0 ? effectiveShippingFee : 0);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -706,7 +708,9 @@ export default function AdminCreateOrderModal({
                         {calculatingFee
                           ? "Đang tính..."
                           : selectedItems.length > 0
-                            ? formatOrderCurrency(shippingFee)
+                            ? isFreeShipping
+                              ? "Miễn phí (Đơn ≥ 2.000.000 ₫)"
+                              : formatOrderCurrency(effectiveShippingFee)
                             : "0 ₫"}
                       </strong>
                     </div>
